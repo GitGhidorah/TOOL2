@@ -1,0 +1,291 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<title>クリップボード形式チェッカー</title>
+<style>
+  :root {
+    --ink: #1c1a17;
+    --paper: #f6f3ec;
+    --panel: #ffffff;
+    --rule: #d8d2c4;
+    --accent: #2f5d50;
+    --accent-soft: #e4ede9;
+    --warn: #9c4221;
+    --mono: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+    --serif: "Iowan Old Style", "Palatino Linotype", Palatino, "Hiragino Mincho ProN", serif;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    padding: 40px 24px 80px;
+    background: var(--paper);
+    color: var(--ink);
+    font-family: var(--serif), "Yu Mincho", serif;
+    display: flex;
+    justify-content: center;
+  }
+  .sheet {
+    width: 100%;
+    max-width: 720px;
+  }
+  h1 {
+    font-size: 1.5rem;
+    letter-spacing: 0.02em;
+    margin: 0 0 4px;
+    font-weight: 600;
+  }
+  .sub {
+    font-size: 0.85rem;
+    color: #6b6558;
+    margin: 0 0 28px;
+    border-bottom: 1px solid var(--rule);
+    padding-bottom: 20px;
+  }
+  button#check {
+    font-family: var(--mono);
+    font-size: 0.85rem;
+    letter-spacing: 0.03em;
+    background: var(--ink);
+    color: var(--paper);
+    border: none;
+    padding: 12px 22px;
+    cursor: pointer;
+    border-radius: 2px;
+  }
+  button#check:hover { background: var(--accent); }
+  button#check:active { transform: translateY(1px); }
+
+  .status {
+    margin-top: 14px;
+    font-family: var(--mono);
+    font-size: 0.78rem;
+    color: var(--warn);
+    min-height: 1.2em;
+  }
+
+  .result {
+    margin-top: 28px;
+    display: none;
+    flex-direction: column;
+    gap: 18px;
+  }
+  .result.show { display: flex; }
+
+  .card {
+    background: var(--panel);
+    border: 1px solid var(--rule);
+    border-radius: 3px;
+    padding: 18px 20px;
+  }
+  .card-head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    margin-bottom: 10px;
+  }
+  .card-title {
+    font-family: var(--mono);
+    font-size: 0.75rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: #6b6558;
+  }
+  .tag {
+    font-family: var(--mono);
+    font-size: 0.72rem;
+    padding: 3px 9px;
+    border-radius: 10px;
+    letter-spacing: 0.02em;
+  }
+  .tag.yes { background: var(--accent-soft); color: var(--accent); }
+  .tag.no  { background: #f1ede3; color: #948d7c; }
+
+  .presence {
+    font-size: 0.95rem;
+    margin-bottom: 8px;
+  }
+  .presence b { color: var(--accent); }
+  .presence.absent { color: #948d7c; font-style: italic; }
+
+  .latex-line {
+    font-family: var(--mono);
+    font-size: 0.82rem;
+    margin: 6px 0 10px;
+  }
+
+  pre.preview {
+    font-family: var(--mono);
+    font-size: 0.78rem;
+    background: #fbfaf6;
+    border: 1px solid var(--rule);
+    border-radius: 2px;
+    padding: 10px 12px;
+    max-height: 160px;
+    overflow: auto;
+    white-space: pre-wrap;
+    word-break: break-word;
+    color: #4a463c;
+    margin: 0;
+  }
+
+  details summary {
+    cursor: pointer;
+    font-family: var(--mono);
+    font-size: 0.72rem;
+    color: #948d7c;
+    margin-top: 4px;
+  }
+
+  .hint {
+    margin-top: 26px;
+    font-size: 0.78rem;
+    color: #948d7c;
+    line-height: 1.7;
+    border-top: 1px solid var(--rule);
+    padding-top: 16px;
+  }
+  .hint code {
+    font-family: var(--mono);
+    background: #efeadd;
+    padding: 1px 5px;
+    border-radius: 2px;
+  }
+</style>
+</head>
+<body>
+<div class="sheet">
+  <h1>クリップボード形式チェッカー</h1>
+  <p class="sub">今コピーされている内容に「プレーンテキスト」「HTML」が含まれているか、そしてそれぞれに LaTeX 記法が含まれているかを調べます。</p>
+
+  <button id="check">クリップボードを確認する</button>
+  <div class="status" id="status"></div>
+
+  <div class="result" id="result">
+
+    <div class="card">
+      <div class="card-head">
+        <span class="card-title">text/plain</span>
+        <span class="tag" id="plainTag">—</span>
+      </div>
+      <div id="plainBody"></div>
+    </div>
+
+    <div class="card">
+      <div class="card-head">
+        <span class="card-title">text/html</span>
+        <span class="tag" id="htmlTag">—</span>
+      </div>
+      <div id="htmlBody"></div>
+    </div>
+
+  </div>
+
+  <p class="hint">
+    ブラウザの仕様上、この確認にはページの操作直後にクリップボード読み取りの許可が必要です（ダイアログが出た場合は「許可」を選んでください）。
+    LaTeX の判定は <code>$...$</code> <code>$$...$$</code> <code>\(...\)</code> <code>\[...\]</code> <code>\begin{...}</code> といった記法の有無を正規表現で調べる簡易チェックです。
+  </p>
+</div>
+
+<script>
+const checkBtn = document.getElementById('check');
+const statusEl = document.getElementById('status');
+const resultEl = document.getElementById('result');
+
+const plainTag = document.getElementById('plainTag');
+const htmlTag = document.getElementById('htmlTag');
+const plainBody = document.getElementById('plainBody');
+const htmlBody = document.getElementById('htmlBody');
+
+// 簡易 LaTeX 検出パターン群
+const LATEX_PATTERNS = [
+  /\$\$[^$]+\$\$/,               // $$ ... $$
+  /(?<!\$)\$[^$\n]+\$(?!\$)/,    // $ ... $
+  /\\\([\s\S]+?\\\)/,            // \( ... \)
+  /\\\[[\s\S]+?\\\]/,            // \[ ... \]
+  /\\begin\{[a-zA-Z*]+\}/,       // \begin{...}
+  /\\(frac|sum|int|sqrt|alpha|beta|gamma|theta|infty|cdot|times|leq|geq|neq|partial|nabla|mathbb|mathcal|hat|vec)\b/
+];
+
+function detectLatex(text) {
+  if (!text) return false;
+  return LATEX_PATTERNS.some(re => re.test(text));
+}
+
+function escapeHtml(s) {
+  return s.replace(/[&<>"']/g, c => ({
+    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+  }[c]));
+}
+
+function renderSection(bodyEl, tagEl, present, rawText) {
+  if (!present) {
+    tagEl.textContent = 'なし';
+    tagEl.className = 'tag no';
+    bodyEl.innerHTML = '<p class="presence absent">この形式のデータはクリップボードにありません。</p>';
+    return;
+  }
+  tagEl.textContent = 'あり';
+  tagEl.className = 'tag yes';
+
+  const hasLatex = detectLatex(rawText);
+  let html = '';
+  html += `<p class="presence">データ長: <b>${rawText.length.toLocaleString()}</b> 文字</p>`;
+  html += `<p class="latex-line">LaTeX 記法: <span class="tag ${hasLatex ? 'yes' : 'no'}">${hasLatex ? '検出あり' : '検出なし'}</span></p>`;
+  html += `<details><summary>内容プレビューを表示</summary><pre class="preview">${escapeHtml(rawText.slice(0, 3000))}${rawText.length > 3000 ? '\n…(省略)' : ''}</pre></details>`;
+  bodyEl.innerHTML = html;
+}
+
+async function inspectClipboard() {
+  statusEl.textContent = '';
+  resultEl.classList.remove('show');
+
+  if (!navigator.clipboard || !navigator.clipboard.read) {
+    statusEl.textContent = 'このブラウザ環境では Clipboard API (read) が利用できません。';
+    return;
+  }
+
+  try {
+    const items = await navigator.clipboard.read();
+
+    let plainText = null;
+    let htmlText = null;
+
+    for (const item of items) {
+      if (item.types.includes('text/plain')) {
+        const blob = await item.getType('text/plain');
+        plainText = await blob.text();
+      }
+      if (item.types.includes('text/html')) {
+        const blob = await item.getType('text/html');
+        htmlText = await blob.text();
+      }
+    }
+
+    // フォールバック: read() で plain が拾えなければ readText() を試す
+    if (plainText === null && navigator.clipboard.readText) {
+      try {
+        const t = await navigator.clipboard.readText();
+        if (t) plainText = t;
+      } catch (e) { /* 無視 */ }
+    }
+
+    renderSection(plainBody, plainTag, plainText !== null && plainText !== '', plainText || '');
+    renderSection(htmlBody, htmlTag, htmlText !== null && htmlText !== '', htmlText || '');
+
+    resultEl.classList.add('show');
+    statusEl.textContent = '';
+
+  } catch (err) {
+    if (err.name === 'NotAllowedError') {
+      statusEl.textContent = 'クリップボードへのアクセスが許可されませんでした。ブラウザの許可設定をご確認ください。';
+    } else {
+      statusEl.textContent = 'クリップボードの読み取りに失敗しました: ' + err.message;
+    }
+  }
+}
+
+checkBtn.addEventListener('click', inspectClipboard);
+</script>
+</body>
+</html>
