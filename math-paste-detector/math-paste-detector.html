@@ -1,0 +1,743 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<title>数式ペースト判定ツール</title>
+<script>
+window.MathJax = {
+  startup: { typeset: false },
+  options: { enableAssistiveMml: false },
+  tex: { displayMath: [['$$','$$'], ['\\[','\\]']], inlineMath: [['$','$'], ['\\(','\\)']] }
+};
+</script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/3.2.2/es5/tex-mml-svg.js"></script>
+<style>
+  :root{
+    --paper:#f6f2e9;
+    --ink:#1f2a3c;
+    --ink-soft:#4a5670;
+    --rule:#d8cfba;
+    --stamp-yes:#2f6b4f;
+    --stamp-yes-bg:#e3ede6;
+    --stamp-no:#9b3d3d;
+    --stamp-no-bg:#f1e4e1;
+    --accent:#8a3324;
+    --card-bg:#fffdf8;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    background:var(--paper);
+    color:var(--ink);
+    font-family: "Iowan Old Style", "Georgia", "Hiragino Mincho ProN", serif;
+    padding:32px 20px 80px;
+  }
+  .wrap{max-width:900px;margin:0 auto;}
+  h1{
+    font-size:1.7rem;
+    letter-spacing:0.02em;
+    margin:0 0 4px;
+    border-bottom:2px solid var(--ink);
+    padding-bottom:10px;
+  }
+  .sub{
+    color:var(--ink-soft);
+    font-size:0.92rem;
+    margin:0 0 28px;
+    line-height:1.7;
+  }
+  .paste-box{
+    background:var(--card-bg);
+    border:1px solid var(--rule);
+    border-radius:2px;
+    box-shadow:0 1px 0 var(--rule);
+    padding:18px;
+    margin-bottom:16px;
+  }
+  textarea{
+    width:100%;
+    min-height:120px;
+    resize:vertical;
+    font-family: "SFMono-Regular","Menlo",monospace;
+    font-size:0.92rem;
+    border:1px solid var(--rule);
+    background:#fffefb;
+    color:var(--ink);
+    padding:12px;
+    border-radius:2px;
+    line-height:1.5;
+  }
+  textarea:focus{outline:2px solid var(--accent);outline-offset:1px;}
+  .hint{
+    font-size:0.78rem;
+    color:var(--ink-soft);
+    margin-top:8px;
+  }
+  .samples{
+    display:flex;
+    flex-wrap:wrap;
+    gap:8px;
+    margin:14px 0 28px;
+  }
+  .samples span.label{
+    font-size:0.78rem;
+    color:var(--ink-soft);
+    align-self:center;
+    margin-right:2px;
+  }
+  button{
+    font-family:inherit;
+    font-size:0.82rem;
+    cursor:pointer;
+    border-radius:2px;
+  }
+  .sample-btn{
+    background:transparent;
+    border:1px solid var(--ink-soft);
+    color:var(--ink);
+    padding:6px 12px;
+  }
+  .sample-btn:hover{background:var(--ink);color:var(--paper);}
+  .clear-btn{
+    background:var(--accent);
+    color:#fff;
+    border:none;
+    padding:8px 16px;
+    font-size:0.85rem;
+  }
+  .clear-btn:hover{opacity:0.88;}
+  .results{
+    display:flex;
+    flex-direction:column;
+    gap:14px;
+  }
+  .card{
+    background:var(--card-bg);
+    border:1px solid var(--rule);
+    border-radius:2px;
+    padding:16px 18px;
+  }
+  .card-head{
+    display:flex;
+    align-items:baseline;
+    justify-content:space-between;
+    gap:10px;
+    margin-bottom:6px;
+  }
+  .fmt-name{
+    font-size:1.02rem;
+    font-weight:bold;
+  }
+  .fmt-context{
+    font-size:0.76rem;
+    color:var(--ink-soft);
+    font-style:italic;
+  }
+  .stamp{
+    font-family:"SFMono-Regular","Menlo",monospace;
+    font-size:0.72rem;
+    letter-spacing:0.06em;
+    padding:3px 9px;
+    border-radius:20px;
+    white-space:nowrap;
+  }
+  .stamp.yes{color:var(--stamp-yes);background:var(--stamp-yes-bg);border:1px solid var(--stamp-yes);}
+  .stamp.no{color:var(--stamp-no);background:var(--stamp-no-bg);border:1px solid #d8b9b9;}
+  .raw{
+    font-family:"SFMono-Regular","Menlo",monospace;
+    font-size:0.8rem;
+    color:var(--ink-soft);
+    background:#f1ede2;
+    padding:8px 10px;
+    border-radius:2px;
+    margin:8px 0;
+    white-space:pre-wrap;
+    word-break:break-word;
+  }
+  .render-box{
+    padding:14px 4px 6px;
+    font-size:1.15rem;
+    overflow-x:auto;
+  }
+  .render-box.line-block{
+    display:block;
+    padding:8px 4px;
+    border-bottom:1px dashed var(--rule);
+  }
+  .render-box.line-block:last-child{
+    border-bottom:none;
+  }
+  .no-match-note{
+    font-size:0.82rem;
+    color:var(--ink-soft);
+    padding:4px 0 2px;
+  }
+  mjx-container{margin:0 !important;}
+  .debug-panel{
+    margin-top:28px;
+    border:1px dashed var(--ink-soft);
+    border-radius:2px;
+    padding:12px 16px;
+    background:#f1ede2;
+  }
+  .debug-panel summary{
+    cursor:pointer;
+    font-size:0.85rem;
+    color:var(--ink-soft);
+  }
+  .debug-panel pre{
+    font-family:"SFMono-Regular","Menlo",monospace;
+    font-size:0.72rem;
+    white-space:pre-wrap;
+    word-break:break-all;
+    max-height:300px;
+    overflow-y:auto;
+    background:#fffefb;
+    border:1px solid var(--rule);
+    padding:10px;
+    margin-top:8px;
+  }
+  /* Safety net: MathJax's assistive-MathML node is meant to be invisible
+     (for screen readers) via its own injected stylesheet. If that stylesheet
+     is ever missing or delayed, force it hidden here too so it can never show
+     up as a second visible copy of the formula. */
+  mjx-assistive-mml{
+    position:absolute !important;
+    top:0 !important; left:0 !important;
+    clip:rect(1px,1px,1px,1px) !important;
+    clip-path: inset(50%) !important;
+    width:1px !important; height:1px !important;
+    padding:0 !important; border:0 !important;
+    overflow:hidden !important;
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>数式ペースト判定ツール</h1>
+  <p class="sub">
+    Word、note、Obsidian など、貼り付け元によって数式の表現方法は異なります。このツールはテキストを貼り付けると、
+    <strong>LaTeX / Markdown数式ブロック / Word数式(OMML/MathML) / AsciiMath / Wordのリニア形式(UnicodeMath)</strong>
+    の5形式それぞれについて判定を行い、該当した形式はすべてレンダリングして表示します。
+  </p>
+
+  <div class="paste-box">
+    <textarea id="pasteArea" placeholder="ここに貼り付け(Ctrl+V / Cmd+V)。Wordの数式をそのまま貼るとMathMLとして検出されます。"></textarea>
+    <div class="hint">
+      ※ このツールでのAsciiMathの記法は <code>~...~</code> で囲む独自の慣例です（統一標準がないため）。内部では簡易変換ロジックでLaTeXに変換してから表示します（近似的な変換です）。<br>
+      ※ Wordのリニア形式は、$ や ``` などの明示的な記号がない状態で ^ / _ / sqrt( ) / ギリシャ文字名などが含まれるプレーンテキストをヒューリスティックに推定・変換します（近似的な変換です）。
+    </div>
+  </div>
+
+  <div class="samples">
+    <span class="label">サンプルを試す:</span>
+    <button class="sample-btn" data-sample="latex">LaTeX ($$…$$)</button>
+    <button class="sample-btn" data-sample="mdfence">Markdown数式ブロック</button>
+    <button class="sample-btn" data-sample="mathml">Word数式(OMML)</button>
+    <button class="sample-btn" data-sample="asciimath">AsciiMath (~…~)</button>
+    <button class="sample-btn" data-sample="wordlinear">Wordリニア形式</button>
+    <button class="sample-btn" data-sample="barelatex">$なしLaTeX (AI回答貼り付け)</button>
+    <button class="clear-btn" id="clearBtn">クリア</button>
+  </div>
+
+  <div class="results" id="results"></div>
+
+  <details class="debug-panel">
+    <summary>デバッグ用: HTMLクリップボードの生データを表示</summary>
+    <p class="hint">貼り付け時にブラウザが渡してきた HTML クリップボードの中身をそのまま表示します。数式の検出・変換がうまくいかない場合、この内容をコピーして共有してください。</p>
+    <pre id="debugHtml">(まだ貼り付けられていません)</pre>
+  </details>
+</div>
+
+<script>
+const FORMATS = [
+  { key:'latex',     name:'① LaTeX',                     context:'Obsidian / note / Typora / 多くのブログエディタ' },
+  { key:'mdfence',   name:'② Markdown数式ブロック',        context:'GitHub Markdown / Pandoc 形式' },
+  { key:'mathml',    name:'③ Word数式 (OMML / MathML)',     context:'MS Wordの数式をそのままコピー&ペーストした場合' },
+  { key:'asciimath', name:'④ AsciiMath',                   context:'一部エディタ・プラグインの入力記法 (本ツールでは ~ ~ 区切り)' },
+  { key:'wordlinear',name:'⑤ Wordのリニア形式 (UnicodeMath)', context:'Wordで数式をプレーンテキストとしてコピーした場合の簡易記法' },
+];
+
+let sampleHTML = ''; // stores synthetic HTML clipboard payload for the mathml sample
+
+const SAMPLES = {
+  latex: {
+    plain: 'ピタゴラスの定理は $$a^2 + b^2 = c^2$$ で表される。また質量とエネルギーの関係は \\(E=mc^2\\) である。',
+    html: ''
+  },
+  mdfence: {
+    plain: '二次方程式の解の公式は以下の通り。\n\n```math\nx = \\frac{-b \\pm \\sqrt{b^2-4ac}}{2a}\n```',
+    html: ''
+  },
+  mathml: {
+    plain: '(Wordから貼り付けたテキスト表現。実際はHTMLクリップボードにOMMLが含まれます)',
+    html: '<m:oMath xmlns:m="http://schemas.openxmlformats.org/officeDocument/2006/math">' +
+          '<m:sSup><m:e><m:r><m:t>x</m:t></m:r></m:e><m:sup><m:r><m:t>2</m:t></m:r></m:sup></m:sSup>' +
+          '<m:r><m:t>+</m:t></m:r>' +
+          '<m:sSup><m:e><m:r><m:t>y</m:t></m:r></m:e><m:sup><m:r><m:t>2</m:t></m:r></m:sup></m:sSup>' +
+          '<m:r><m:t>=</m:t></m:r>' +
+          '<m:sSup><m:e><m:r><m:t>z</m:t></m:r></m:e><m:sup><m:r><m:t>2</m:t></m:r></m:sup></m:sSup>' +
+          '</m:oMath>'
+  },
+  asciimath: {
+    plain: '円の面積は ~pi r^2~ で求められる。',
+    html: ''
+  },
+  wordlinear: {
+    plain: '3層目の重み w_3 の微分:\n∂L/(∂w_3)=δ_y・∂y/(∂w_3)\n2層目に伝える信号（メモ）をつくる:',
+    html: ''
+  },
+  barelatex: {
+    plain: '\\frac{\\partial L}{\\partial w_3} = \\delta_y \\cdot \\frac{\\partial y}{\\partial w_3}',
+    html: ''
+  }
+};
+
+const resultsEl = document.getElementById('results');
+const pasteArea = document.getElementById('pasteArea');
+let lastHtmlClipboard = '';
+
+// Render placeholders on load
+function renderSkeleton(){
+  resultsEl.innerHTML = FORMATS.map(f => cardTemplate(f)).join('');
+}
+function cardTemplate(f, matched){
+  return `<div class="card" id="card-${f.key}">
+    <div class="card-head">
+      <div>
+        <div class="fmt-name">${f.name}</div>
+        <div class="fmt-context">${f.context}</div>
+      </div>
+      <div class="stamp no" id="stamp-${f.key}">未判定</div>
+    </div>
+    <div id="body-${f.key}"><div class="no-match-note">まだ何も貼り付けられていません。</div></div>
+  </div>`;
+}
+renderSkeleton();
+
+function setStamp(key, matched){
+  const el = document.getElementById('stamp-'+key);
+  if(matched){ el.textContent='検出'; el.className='stamp yes'; }
+  else{ el.textContent='該当なし'; el.className='stamp no'; }
+}
+function setBody(key, html){
+  document.getElementById('body-'+key).innerHTML = html;
+}
+
+// ---------- Detectors ----------
+function detectLatex(text){
+  const found = [];
+  const patterns = [
+    { re:/\$\$([\s\S]+?)\$\$/g, display:true },
+    { re:/\\\[([\s\S]+?)\\\]/g, display:true },
+    { re:/\\\(([\s\S]+?)\\\)/g, display:false },
+    { re:/(?<!\$)\$(?!\$)([^\$\n]+?)\$(?!\$)/g, display:false },
+  ];
+  for(const p of patterns){
+    let m;
+    while((m = p.re.exec(text)) !== null){
+      found.push({ expr:m[1].trim(), display:p.display });
+    }
+  }
+  // Bare LaTeX: no $ / \(...\) / \[...\] delimiters at all, but the text is made of
+  // real LaTeX command tokens (\frac, \partial, \cdot, \delta, ...). This is exactly
+  // what many AI chat tools (Gemini, ChatGPT, etc.) put on the clipboard, and it's
+  // what Word's "Math AutoCorrect" recognizes and converts into a real equation object
+  // when pasted — even though there isn't a single $ in sight.
+  if(found.length === 0){
+    const t = text.trim();
+    const cmdRe = /\\(frac|partial|sqrt|sum|int|cdot|times|div|pm|mp|leq|geq|neq|approx|equiv|infty|nabla|hat|bar|vec|left|right|forall|exists|in|subset|cup|cap|alpha|beta|gamma|delta|epsilon|zeta|eta|theta|iota|kappa|lambda|mu|nu|xi|pi|rho|sigma|tau|upsilon|phi|chi|psi|omega|Delta|Sigma|Omega|Gamma|Lambda|Theta)\b/;
+    if(t && cmdRe.test(t) && !/```/.test(t)){
+      found.push({ expr:t, display:true, bare:true });
+    }
+  }
+  return found;
+}
+
+function detectMdFence(text){
+  const found = [];
+  const re = /```(?:math|latex|tex)\s*\n([\s\S]+?)```/g;
+  let m;
+  while((m = re.exec(text)) !== null){
+    found.push({ expr:m[1].trim(), display:true });
+  }
+  return found;
+}
+
+function detectMathML(html){
+  const found = [];
+  if(!html) return found;
+  const mathmlRe = /<math[\s\S]*?<\/math>/gi;
+  let m;
+  while((m = mathmlRe.exec(html)) !== null){
+    found.push({ type:'mathml', raw:m[0] });
+  }
+  // Word does NOT put standard W3C MathML on the clipboard for an equation —
+  // it uses its own schema, OMML (Office Math Markup Language), tagged
+  // <m:oMath>...</m:oMath> (namespace prefix may vary). This is the actual
+  // format you get from a real "copy equation from Word" paste.
+  const ommlRe = /<(\w+:)?oMath\b[^>]*>[\s\S]*?<\/(\w+:)?oMath>/gi;
+  while((m = ommlRe.exec(html)) !== null){
+    found.push({ type:'omml', raw:m[0] });
+  }
+  return found;
+}
+
+// ---- Minimal OMML (Office Math Markup Language) -> LaTeX converter ----
+// Covers the constructs that show up in typical Word equations: fractions,
+// sub/superscripts, radicals, delimiters (parentheses groups), n-ary
+// operators (sum/integral/product), functions, and basic accents/bars.
+// Anything unrecognized falls through to its plain text content, so the
+// output degrades gracefully rather than breaking.
+function ommlLocalName(el){
+  return (el.tagName || '').replace(/^.*:/, '').toUpperCase();
+}
+function ommlFindChild(el, name){
+  for(const c of el.children){
+    if(ommlLocalName(c) === name) return c;
+  }
+  return null;
+}
+function ommlFindChildren(el, name){
+  return Array.from(el.children).filter(c => ommlLocalName(c) === name);
+}
+function ommlConvertChildren(el){
+  if(!el) return '';
+  let s = '';
+  for(const c of el.children) s += ommlConvertNode(c);
+  return s;
+}
+function ommlConvertNode(el){
+  if(!el || el.nodeType !== 1) return '';
+  const tag = ommlLocalName(el);
+  if(tag.endsWith('PR')) return ''; // *Pr elements are formatting/properties, not content
+
+  switch(tag){
+    case 'T': return el.textContent || '';
+    case 'R': return el.textContent || '';
+    case 'OMATH': case 'OMATHPARA': return ommlConvertChildren(el);
+    case 'F': {
+      const num = ommlFindChild(el,'NUM'), den = ommlFindChild(el,'DEN');
+      return `\\frac{${ommlConvertChildren(num)}}{${ommlConvertChildren(den)}}`;
+    }
+    case 'SSUB': {
+      const e = ommlFindChild(el,'E'), sub = ommlFindChild(el,'SUB');
+      return `${ommlConvertChildren(e)}_{${ommlConvertChildren(sub)}}`;
+    }
+    case 'SSUP': {
+      const e = ommlFindChild(el,'E'), sup = ommlFindChild(el,'SUP');
+      return `${ommlConvertChildren(e)}^{${ommlConvertChildren(sup)}}`;
+    }
+    case 'SSUBSUP': {
+      const e = ommlFindChild(el,'E'), sub = ommlFindChild(el,'SUB'), sup = ommlFindChild(el,'SUP');
+      return `${ommlConvertChildren(e)}_{${ommlConvertChildren(sub)}}^{${ommlConvertChildren(sup)}}`;
+    }
+    case 'RAD': {
+      const deg = ommlFindChild(el,'DEG'), e = ommlFindChild(el,'E');
+      const radPr = ommlFindChild(el,'RADPR');
+      const hideDeg = radPr && ommlFindChild(radPr,'DEGHIDE');
+      const degStr = deg ? ommlConvertChildren(deg).trim() : '';
+      if(!degStr || hideDeg) return `\\sqrt{${ommlConvertChildren(e)}}`;
+      return `\\sqrt[${degStr}]{${ommlConvertChildren(e)}}`;
+    }
+    case 'D': {
+      const es = ommlFindChildren(el,'E');
+      const inner = es.map(x => ommlConvertChildren(x)).join(', ');
+      return `\\left(${inner}\\right)`;
+    }
+    case 'NARY': {
+      const naryPr = ommlFindChild(el,'NARYPR');
+      const chrEl = naryPr && ommlFindChild(naryPr,'CHR');
+      const chr = chrEl ? (chrEl.getAttribute('m:val') || chrEl.getAttribute('val') || '\u2211') : '\u2211';
+      const opMap = {'\u2211':'\\sum', '\u222B':'\\int', '\u220F':'\\prod', '\u22C3':'\\bigcup', '\u22C2':'\\bigcap'};
+      const op = opMap[chr] || chr;
+      const sub = ommlFindChild(el,'SUB'), sup = ommlFindChild(el,'SUP'), e = ommlFindChild(el,'E');
+      return `${op}_{${ommlConvertChildren(sub)}}^{${ommlConvertChildren(sup)}}{${ommlConvertChildren(e)}}`;
+    }
+    case 'FUNC': {
+      const fname = ommlFindChild(el,'FNAME'), e = ommlFindChild(el,'E');
+      return `\\operatorname{${ommlConvertChildren(fname)}}\\left(${ommlConvertChildren(e)}\\right)`;
+    }
+    case 'ACC': {
+      const e = ommlFindChild(el,'E');
+      return `\\hat{${ommlConvertChildren(e)}}`;
+    }
+    case 'BAR': {
+      const e = ommlFindChild(el,'E');
+      return `\\overline{${ommlConvertChildren(e)}}`;
+    }
+    default: {
+      if(el.children.length) return ommlConvertChildren(el);
+      return el.textContent || '';
+    }
+  }
+}
+function ommlToLatex(ommlString){
+  const doc = new DOMParser().parseFromString(ommlString, 'text/html');
+  const root = doc.body.firstElementChild;
+  if(!root) return '';
+  return ommlConvertNode(root).trim();
+}
+
+function detectAsciiMath(text){
+  const found = [];
+  const re = /~([^~\n]+?)~/g;
+  let m;
+  while((m = re.exec(text)) !== null){
+    found.push(m[1].trim());
+  }
+  return found;
+}
+
+function detectWordLinear(text){
+  // Only consider as a candidate if no explicit $ / ``` / ~ delimiters are present,
+  // and the text has heuristic markers of Word's plain-text math shorthand.
+  const t = text.trim();
+  if(!t) return [];
+  if(/\$|```|~/.test(t)) return [];
+  const marker = /\^|_[a-zA-Z0-9]|sqrt\(|[a-zA-Z0-9]\/[a-zA-Z0-9]|<=|>=|!=|\+-|\b(alpha|beta|gamma|delta|epsilon|theta|lambda|mu|sigma|omega|pi|infinity)\b/i;
+  if(marker.test(t)){
+    return [t];
+  }
+  return [];
+}
+
+function wordLinearToTeX(input){
+  let s = input;
+  // square roots: sqrt(...)
+  s = s.replace(/sqrt\(([^()]+)\)/gi, '\\sqrt{$1}');
+  // greek letter names -> \name
+  s = s.replace(/\b(alpha|beta|gamma|delta|epsilon|zeta|eta|theta|iota|kappa|lambda|mu|nu|xi|pi|rho|sigma|tau|upsilon|phi|chi|psi|omega)\b/gi,
+    (m0, g1) => '\\' + g1.toLowerCase());
+  // simple fractions a/b -> \frac{a}{b} (single alnum tokens only, best-effort)
+  s = s.replace(/([a-zA-Z0-9]+)\/([a-zA-Z0-9]+)/g, '\\frac{$1}{$2}');
+  // comparison / misc operators
+  s = s.replace(/<=/g, '\\leq').replace(/>=/g, '\\geq').replace(/!=/g, '\\neq')
+       .replace(/\+-/g, '\\pm').replace(/\binfinity\b/gi, '\\infty');
+  // wrap superscript / subscript groups in braces
+  s = s.replace(/\^([a-zA-Z0-9]+)/g, '^{$1}');
+  s = s.replace(/_([a-zA-Z0-9]+)/g, '_{$1}');
+  return s;
+}
+
+// ---------- Renderers ----------
+let mjxReady = null;
+function ensureMathJax(){
+  if(!mjxReady){
+    mjxReady = new Promise((resolve) => {
+      const check = () => {
+        if(window.MathJax && MathJax.startup && MathJax.startup.promise){
+          MathJax.startup.promise.then(resolve);
+        } else {
+          setTimeout(check, 60);
+        }
+      };
+      check();
+    });
+  }
+  return mjxReady;
+}
+
+// Every rendered formula gets its own placeholder <div id="mjxslot-N"> containing
+// the plain-text delimited LaTeX (e.g. "\[ ... \]"). We insert that placeholder
+// into the DOM first (via setBody), then call the standard MathJax.typesetPromise()
+// on just those elements. This is the same code path essentially every MathJax
+// website uses (as opposed to the lower-level tex2svg() conversion API we used
+// before), so stylesheet injection and assistive-MathML hiding are handled the
+// normal, well-tested way rather than something we have to manage by hand.
+let slotCounter = 0;
+function nextSlotId(){ return 'mjxslot-' + (++slotCounter); }
+
+async function typesetSlots(ids){
+  await ensureMathJax();
+  const els = ids.map(id => document.getElementById(id)).filter(Boolean);
+  if(!els.length) return;
+  try{
+    await MathJax.typesetPromise(els);
+  }catch(e){
+    // leave the plain LaTeX text visible in the slot as a fallback
+  }
+}
+
+function renderTeXList(items){
+  let html = '';
+  const ids = [];
+  for(const item of items){
+    const id = nextSlotId();
+    ids.push(id);
+    const wrapped = item.display ? ('\\[' + item.expr + '\\]') : ('\\(' + item.expr + '\\)');
+    const tag = item.bare ? '<div class="no-match-note">$ による区切りなし。バックスラッシュコマンドから直接LaTeXと判定しました。</div>' : '';
+    html += `${tag}<div class="raw">${escapeHTML(item.expr)}</div><div class="render-box" id="${id}">${escapeHTML(wrapped)}</div>`;
+  }
+  return { html, ids };
+}
+
+function renderConvertedList(items){
+  // items: array of raw plain-text strings (AsciiMath, ~...~ delimited)
+  // that get converted to LaTeX via wordLinearToTeX before display.
+  let html = '';
+  const ids = [];
+  for(const raw of items){
+    const tex = wordLinearToTeX(raw);
+    const id = nextSlotId();
+    ids.push(id);
+    html += `<div class="raw">入力: ${escapeHTML(raw)}\n変換後(LaTeX): ${escapeHTML(tex)}</div><div class="render-box" id="${id}">\\[${escapeHTML(tex)}\\]</div>`;
+  }
+  return { html, ids };
+}
+
+function renderWordLinearList(items){
+  // items: array of whole pasted blocks that look like Word's plain-text math
+  // shorthand. These often come from a chunk of text that mixes prose,
+  // bullet points, and one formula per line — if we converted the whole
+  // block as a single expression, every newline would collapse into a
+  // space inside math mode and the layout would turn into one run-on line.
+  // So instead: split on line breaks first, and convert/typeset each
+  // non-empty line as its own separate math block, stacked vertically.
+  let html = '';
+  const ids = [];
+  for(const raw of items){
+    html += `<div class="raw">入力(そのまま):\n${escapeHTML(raw)}</div>`;
+    const lines = raw.split(/\r?\n/).map(l => l.trim()).filter(l => l.length > 0);
+    for(const line of lines){
+      const tex = wordLinearToTeX(line);
+      const id = nextSlotId();
+      ids.push(id);
+      html += `<div class="render-box line-block" id="${id}">\\[${escapeHTML(tex)}\\]</div>`;
+    }
+  }
+  return { html, ids };
+}
+
+function renderMathMLList(items){
+  let html = '';
+  const ids = [];
+  for(const item of items){
+    if(item.type === 'mathml'){
+      html += `<div class="raw">${escapeHTML(item.raw)}</div><div class="render-box">${item.raw}</div>`;
+      html += `<div class="no-match-note">標準MathML: お使いのブラウザがMathML Core未対応の場合、正しく表示されないことがあります。</div>`;
+    } else if(item.type === 'omml'){
+      const tex = ommlToLatex(item.raw);
+      const id = nextSlotId();
+      ids.push(id);
+      html += `<div class="raw">検出: Wordの数式 (OMML)\n変換後(LaTeX): ${escapeHTML(tex)}</div><div class="render-box" id="${id}">\\[${escapeHTML(tex)}\\]</div>`;
+    }
+  }
+  return { html, ids };
+}
+
+function escapeHTML(s){
+  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+// SVG output is self-contained (paths are drawn directly, no external font
+// files or injected stylesheet needed), so there is no stylesheet step here.
+
+// ---------- Main analyze pipeline ----------
+// Guard: every call gets a token. If a newer call has started by the time an
+// older call's async rendering finishes, the older call's results are simply
+// discarded instead of being written to the DOM. This makes it safe even if
+// analyze() ends up being triggered more than once for the same change
+// (e.g. a browser firing an extra input event after a paste) — the DOM can
+// never end up with two renders stacked on top of each other.
+let analyzeToken = 0;
+
+async function analyze(plainText, htmlText){
+  const myToken = ++analyzeToken;
+  const stillCurrent = () => myToken === analyzeToken;
+
+  const latex = detectLatex(plainText);
+  const mdfence = detectMdFence(plainText);
+  const mathml = detectMathML(htmlText);
+  const asciimath = detectAsciiMath(plainText);
+  const wordlinear = detectWordLinear(plainText);
+
+  if(!stillCurrent()) return;
+
+  setStamp('latex', latex.length>0);
+  setStamp('mdfence', mdfence.length>0);
+  setStamp('mathml', mathml.length>0);
+  setStamp('asciimath', asciimath.length>0);
+  setStamp('wordlinear', wordlinear.length>0);
+
+  setBody('latex', latex.length ? '<div class="no-match-note">レンダリング中…</div>' : '<div class="no-match-note">$ …$ / $$…$$ / \\(…\\) / \\[…\\] も、\\frac \\partial \\cdot などのバックスラッシュコマンドも見つかりませんでした。</div>');
+  setBody('mdfence', mdfence.length ? '<div class="no-match-note">レンダリング中…</div>' : '<div class="no-match-note">```math / ```latex / ```tex のコードブロックが見つかりませんでした。</div>');
+  setBody('mathml', mathml.length ? '<div class="no-match-note">レンダリング中…</div>' : '<div class="no-match-note">HTMLクリップボード内に &lt;math&gt;…&lt;/math&gt; も &lt;m:oMath&gt;…&lt;/m:oMath&gt; (WordのOMML) も見つかりませんでした。実際のWordの数式は「コピー」→対象アプリへ「貼り付け」で検出されます。</div>');
+  setBody('asciimath', asciimath.length ? '<div class="no-match-note">レンダリング中…</div>' : '<div class="no-match-note">~…~ で囲まれた記述が見つかりませんでした。</div>');
+  setBody('wordlinear', wordlinear.length ? '<div class="no-match-note">レンダリング中…</div>' : '<div class="no-match-note">$ / ``` / ~ の明示的な記号がなく、かつ ^ _ sqrt( ギリシャ文字名などの特徴も見つからなかったため、該当なしと判定しました。</div>');
+
+  const latexR = latex.length ? renderTeXList(latex) : null;
+  if(!stillCurrent()) return;
+  if(latexR) setBody('latex', latexR.html);
+
+  const mdfenceR = mdfence.length ? renderTeXList(mdfence) : null;
+  if(!stillCurrent()) return;
+  if(mdfenceR) setBody('mdfence', mdfenceR.html);
+
+  const mathmlR = mathml.length ? renderMathMLList(mathml) : null;
+  if(!stillCurrent()) return;
+  if(mathmlR) setBody('mathml', mathmlR.html);
+
+  const asciimathR = asciimath.length ? renderConvertedList(asciimath) : null;
+  if(!stillCurrent()) return;
+  if(asciimathR) setBody('asciimath', asciimathR.html);
+
+  const wordlinearR = wordlinear.length ? renderWordLinearList(wordlinear) : null;
+  if(!stillCurrent()) return;
+  if(wordlinearR) setBody('wordlinear', wordlinearR.html);
+
+  // All placeholders are now in the DOM; typeset them in one batch.
+  const allIds = [
+    ...(latexR ? latexR.ids : []),
+    ...(mdfenceR ? mdfenceR.ids : []),
+    ...(mathmlR ? mathmlR.ids : []),
+    ...(asciimathR ? asciimathR.ids : []),
+    ...(wordlinearR ? wordlinearR.ids : []),
+  ];
+  if(allIds.length){
+    await typesetSlots(allIds);
+  }
+}
+
+// ---------- Events ----------
+function updateDebugPanel(html){
+  const el = document.getElementById('debugHtml');
+  el.textContent = html ? html : '(HTMLクリップボードは空でした。プレーンテキストとしてのみ貼り付けられた可能性があります)';
+}
+
+// The 'paste' handler's only job is to capture the HTML clipboard payload
+// (needed for MathML detection) — it does NOT call analyze() itself. The
+// browser's own 'input' event (which always follows a paste once the text
+// is actually inserted) is the single trigger for analyze(). This avoids
+// having to guess how many 'input' events a given browser fires per paste;
+// the token guard above makes any extra calls harmless no-ops.
+pasteArea.addEventListener('paste', (e) => {
+  const cd = e.clipboardData || window.clipboardData;
+  lastHtmlClipboard = cd.getData('text/html') || '';
+  updateDebugPanel(lastHtmlClipboard);
+});
+
+pasteArea.addEventListener('input', () => {
+  analyze(pasteArea.value, lastHtmlClipboard);
+});
+
+document.querySelectorAll('.sample-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const key = btn.getAttribute('data-sample');
+    const s = SAMPLES[key];
+    pasteArea.value = s.plain;
+    lastHtmlClipboard = s.html;
+    updateDebugPanel(s.html);
+    analyze(s.plain, s.html);
+  });
+});
+
+document.getElementById('clearBtn').addEventListener('click', () => {
+  pasteArea.value = '';
+  lastHtmlClipboard = '';
+  updateDebugPanel('');
+  renderSkeleton();
+});
+</script>
+</body>
+</html>
