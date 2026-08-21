@@ -1,0 +1,605 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Medium Paste Compatibility Checker</title>
+<style>
+  :root{
+    --bg:#F4F6F5;
+    --surface:#FFFFFF;
+    --ink:#1C2321;
+    --muted:#5C6A6C;
+    --line:#DCE3E1;
+    --brand:#2B4162;
+    --brand-ink:#FFFFFF;
+    --ok:#2F7D5C;
+    --ok-bg:#E7F3ED;
+    --broken:#C1443A;
+    --broken-bg:#FBEAE8;
+    --partial:#B98900;
+    --partial-bg:#FBF3DD;
+    --untested:#9AA5A9;
+    --untested-bg:#EDEFEF;
+    --mono: ui-monospace, "SF Mono", "Consolas", "Menlo", monospace;
+    --sans: -apple-system, "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    background:var(--bg);
+    color:var(--ink);
+    font-family:var(--sans);
+    line-height:1.7;
+    padding-bottom:80px;
+  }
+  header.tool-header{
+    background:var(--brand);
+    color:var(--brand-ink);
+    padding:28px 20px 22px;
+    position:sticky;
+    top:0;
+    z-index:20;
+  }
+  .header-inner{ max-width:920px; margin:0 auto; }
+  header.tool-header h1{ margin:0 0 6px; font-size:1.35rem; letter-spacing:0.02em; }
+  header.tool-header p{ margin:0; font-size:0.88rem; color:#C7D2DE; }
+  .stat-bar{ display:flex; gap:14px; margin-top:14px; flex-wrap:wrap; font-family:var(--mono); font-size:0.78rem; }
+  .stat-pill{ background:rgba(255,255,255,0.1); border:1px solid rgba(255,255,255,0.25); border-radius:20px; padding:4px 12px; display:flex; align-items:center; gap:6px; }
+  .stat-dot{width:8px;height:8px;border-radius:50%;display:inline-block;}
+  .stat-dot.ok{background:#5CD3A0;}
+  .stat-dot.broken{background:#F08E85;}
+  .stat-dot.partial{background:#F0CC5A;}
+  .stat-dot.untested{background:#C8CFCF;}
+
+  main{ max-width:920px; margin:0 auto; padding:24px 20px 0; }
+  .howto{ background:var(--surface); border:1px solid var(--line); border-left:4px solid var(--brand); border-radius:6px; padding:16px 18px; margin-bottom:28px; font-size:0.92rem; }
+  .howto h2{ margin:0 0 8px; font-size:0.95rem; }
+  .howto ol{margin:0; padding-left:20px;}
+  .howto li{margin-bottom:4px;}
+  .howto .small{ color:var(--muted); font-size:0.82rem; margin-top:8px; }
+
+  .category-label{ font-family:var(--mono); font-size:0.75rem; letter-spacing:0.08em; color:var(--muted); text-transform:uppercase; margin:32px 0 10px; border-bottom:1px solid var(--line); padding-bottom:6px; }
+
+  .test-card{ background:var(--surface); border:1px solid var(--line); border-radius:8px; margin-bottom:18px; overflow:hidden; }
+  .test-card.status-ok{border-color:var(--ok);}
+  .test-card.status-broken{border-color:var(--broken);}
+  .test-card.status-partial{border-color:var(--partial);}
+
+  .test-card-head{ display:flex; align-items:center; justify-content:space-between; gap:10px; padding:10px 14px; background:#FAFBFA; border-bottom:1px solid var(--line); flex-wrap:wrap; }
+  .test-card-title{ display:flex; align-items:baseline; gap:8px; }
+  .test-id{ font-family:var(--mono); font-size:0.72rem; color:var(--muted); background:var(--untested-bg); padding:2px 6px; border-radius:4px; }
+  .test-title{ font-weight:600; font-size:0.92rem; }
+  .test-controls{ display:flex; align-items:center; gap:8px; }
+  select.status-select{ font-family:var(--sans); font-size:0.78rem; padding:4px 6px; border-radius:4px; border:1px solid var(--line); background:var(--untested-bg); color:var(--ink); }
+  select.status-select.status-ok{background:var(--ok-bg); border-color:var(--ok); color:var(--ok);}
+  select.status-select.status-broken{background:var(--broken-bg); border-color:var(--broken); color:var(--broken);}
+  select.status-select.status-partial{background:var(--partial-bg); border-color:var(--partial); color:var(--partial);}
+
+  button.copy-btn{ font-family:var(--mono); font-size:0.75rem; background:var(--brand); color:#fff; border:none; padding:6px 12px; border-radius:5px; cursor:pointer; }
+  button.copy-btn:hover{opacity:0.88;}
+  button.copy-btn.copied{background:var(--ok);}
+
+  .test-card-body{ padding:16px 18px; }
+  .section-label{ font-family:var(--mono); font-size:0.7rem; color:var(--muted); text-transform:uppercase; letter-spacing:0.06em; margin:14px 0 6px; }
+  .note-input{ width:100%; margin-top:10px; font-family:var(--sans); font-size:0.82rem; padding:6px 8px; border:1px solid var(--line); border-radius:4px; color:var(--muted); }
+
+  .paste-zone{ min-height:48px; border:1.5px dashed var(--line); border-radius:6px; padding:10px 12px; font-size:0.9rem; background:#FCFDFD; }
+  .paste-zone:focus{ outline:none; border-color:var(--brand); background:#fff; }
+  .paste-zone:empty:before{ content: attr(data-placeholder); color:#A6AEAF; }
+
+  .auto-result{ margin-top:8px; font-size:0.85rem; }
+  .auto-result-text{ margin-top:4px; width:100%; max-width:100%; overflow-wrap:anywhere; word-break:break-word; white-space:normal; }
+  .badge{ font-family:var(--mono); font-size:0.72rem; padding:2px 8px; border-radius:12px; white-space:nowrap; flex-shrink:0; }
+  .badge.ok{ background:var(--ok-bg); color:var(--ok); }
+  .badge.broken{ background:var(--broken-bg); color:var(--broken); }
+  .badge.partial{ background:var(--partial-bg); color:var(--partial); }
+
+  .raw-toggle{ margin-top:8px; font-size:0.78rem; color:var(--muted); }
+  .raw-toggle summary{ cursor:pointer; }
+  .raw-html{ font-family:var(--mono); font-size:0.72rem; background:#F5F5F3; border:1px solid var(--line); border-radius:4px; padding:8px; margin-top:6px; white-space:pre-wrap; word-break:break-all; max-height:180px; overflow:auto; }
+
+  /* --- rendered test content styles (this is what gets copied) --- */
+  .payload table{border-collapse:collapse; width:100%;}
+  .payload table th, .payload table td{border:1px solid #999; padding:6px 10px;}
+  .payload table th{background:#eee;}
+  .payload blockquote{border-left:4px solid #999; margin:0; padding:2px 0 2px 14px; color:#444;}
+  .payload pre{background:#282c34; color:#e6e6e6; padding:12px; border-radius:6px; overflow-x:auto; font-family:var(--mono); font-size:0.85rem;}
+  .payload code{background:#eee; padding:1px 5px; border-radius:3px; font-family:var(--mono); font-size:0.9em;}
+  .payload pre code{background:none; padding:0;}
+  .payload .col-2{columns:2; column-gap:24px;}
+  .payload details{border:1px solid #ccc; border-radius:6px; padding:8px 12px;}
+  .payload .hl{background:#FFF3A3; padding:0 2px;}
+  .payload .colored{color:#B5432D; font-weight:bold;}
+
+  footer.export-bar{ position:fixed; bottom:0; left:0; right:0; background:var(--brand); padding:12px 20px; display:flex; justify-content:center; gap:12px; z-index:20; }
+  footer.export-bar button{ font-family:var(--mono); font-size:0.82rem; padding:8px 16px; border-radius:5px; border:none; cursor:pointer; }
+  #exportBtn{background:#fff; color:var(--brand); font-weight:600;}
+  #resetBtn{background:transparent; color:#C7D2DE; border:1px solid rgba(255,255,255,0.35);}
+
+  #exportModal{ display:none; position:fixed; inset:0; background:rgba(20,25,25,0.55); z-index:50; align-items:center; justify-content:center; padding:20px; }
+  #exportModal .modal-box{ background:#fff; border-radius:8px; max-width:680px; width:100%; max-height:80vh; display:flex; flex-direction:column; padding:18px; }
+  #exportModal h3{margin:0 0 10px;}
+  #exportModal textarea{ flex:1; min-height:300px; font-family:var(--mono); font-size:0.8rem; padding:10px; border:1px solid var(--line); border-radius:6px; resize:vertical; }
+  #exportModal .modal-actions{ display:flex; justify-content:flex-end; gap:10px; margin-top:12px; }
+  #exportModal button{ font-family:var(--mono); font-size:0.8rem; padding:7px 14px; border-radius:5px; border:1px solid var(--line); background:#fff; cursor:pointer; }
+  #exportModal button.primary{background:var(--brand); color:#fff; border-color:var(--brand);}
+</style>
+</head>
+<body>
+
+<header class="tool-header">
+  <div class="header-inner">
+    <h1>Medium Paste Compatibility Checker</h1>
+    <p>① "Copy" copies the original HTML with formatting → ② Paste into Medium → ③ Paste the result back here and it's auto-graded OK / Broken.</p>
+    <div class="stat-bar" id="statBar"></div>
+  </div>
+</header>
+
+<main>
+  <div class="howto">
+    <h2>How to use</h2>
+    <ol>
+      <li>Click "Copy" on a card to copy it as rich HTML</li>
+      <li>Paste it into the Medium editor (Cmd/Ctrl+V)</li>
+      <li>Check how it renders in Medium, then <b>select that content and copy it again</b></li>
+      <li>Click the "Paste result from Medium" box on this tool and paste (Cmd/Ctrl+V)</li>
+      <li>The structure is analyzed automatically and graded OK / Broken / Partial, with a badge and a reason</li>
+      <li>If the auto-grade looks wrong you can override it with the dropdown. When you're done, "Export results" writes everything out as Markdown</li>
+    </ol>
+    <div class="small">* Grading is a simple heuristic that inspects the HTML structure (tags, nesting, attributes) captured at paste time. A visual double-check is recommended.<br>* Important note: Medium sometimes expresses appearance through its own CSS classes rather than inline styles. When that happens, content can look perfectly fine inside Medium's editor, but look like plain unstyled text once copied back out, because the class names have no matching stylesheet outside Medium. That's a different question from "how does it look once pasted into Medium" — it's about "what survives copying it back out of Medium." When a "Partial" verdict shows a class name, that's this case — trust what you actually saw in the Medium editor over this tool's verdict.</div>
+  </div>
+
+  <div id="testContainer"></div>
+</main>
+
+<footer class="export-bar">
+  <button id="exportBtn">Export results</button>
+  <button id="resetBtn">Reset all statuses</button>
+</footer>
+
+<div id="exportModal">
+  <div class="modal-box">
+    <h3>Results (Markdown)</h3>
+    <textarea id="exportText" readonly></textarea>
+    <div class="modal-actions">
+      <button id="modalCopyBtn">Copy to clipboard</button>
+      <button id="modalCloseBtn" class="primary">Close</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const TESTS = [
+  { id:"L-01", cat:"Lists", title:"Bulleted list (1 level)", html:
+    `<ul><li>Apple</li><li>Orange</li><li>Grape</li></ul>` },
+  { id:"L-02", cat:"Lists", title:"Bulleted list (2+ nested levels)", html:
+    `<ul><li>Fruit
+      <ul><li>Apple
+        <ul><li>Honeycrisp</li><li>Granny Smith</li></ul>
+      </li><li>Orange</li></ul>
+    </li><li>Vegetables<ul><li>Carrot</li></ul></li></ul>` },
+  { id:"L-03", cat:"Lists", title:"Numbered list (flat)", html:
+    `<ol><li>Step 1</li><li>Step 2</li><li>Step 3</li></ol>` },
+  { id:"L-04", cat:"Lists", title:"Numbered list (nested)", html:
+    `<ol><li>Prep<ol><li>Gather ingredients</li><li>Gather tools</li></ol></li><li>Cook</li></ol>` },
+  { id:"L-05", cat:"Lists", title:"Task list (with checkboxes)", html:
+    `<ul style="list-style:none;padding-left:0;">
+      <li><input type="checkbox" checked disabled> Completed task</li>
+      <li><input type="checkbox" disabled> Incomplete task</li>
+    </ul>` },
+  { id:"L-06", cat:"Lists", title:"Definition list (dl/dt/dd)", html:
+    `<dl><dt>etymology</dt><dd>The origin and history of a word.</dd>
+      <dt>cognate</dt><dd>A word descended from the same ancestral root.</dd></dl>` },
+
+  { id:"T-01", cat:"Tables", title:"Simple table", html:
+    `<table style="border-collapse:collapse;width:100%;"><thead><tr><th style="border:1px solid #999;padding:6px 10px;background:#eee;">Word</th><th style="border:1px solid #999;padding:6px 10px;background:#eee;">Origin</th><th style="border:1px solid #999;padding:6px 10px;background:#eee;">Meaning</th></tr></thead>
+     <tbody><tr><td style="border:1px solid #999;padding:6px 10px;">etymology</td><td style="border:1px solid #999;padding:6px 10px;">Greek etymon</td><td style="border:1px solid #999;padding:6px 10px;">origin</td></tr>
+     <tr><td style="border:1px solid #999;padding:6px 10px;">cognate</td><td style="border:1px solid #999;padding:6px 10px;">Latin cognatus</td><td style="border:1px solid #999;padding:6px 10px;">related word</td></tr></tbody></table>` },
+  { id:"T-02", cat:"Tables", title:"Table with merged cells", html:
+    `<table style="border-collapse:collapse;width:100%;"><tr><th colspan="2" style="border:1px solid #999;padding:6px 10px;background:#eee;">Heading (merged cell)</th></tr>
+     <tr><td style="border:1px solid #999;padding:6px 10px;">A</td><td style="border:1px solid #999;padding:6px 10px;">B</td></tr></table>` },
+
+  { id:"C-01", cat:"Code", title:"Inline code", html:
+    `<p>The variable is written like <code style="background:#eee;padding:1px 5px;border-radius:3px;font-family:ui-monospace,SFMono-Regular,Consolas,Menlo,monospace;font-size:0.9em;">const x = 1;</code>.</p>` },
+  { id:"C-02", cat:"Code", title:"Multi-line code block", html:
+    `<pre style="background:#282c34;color:#e6e6e6;padding:12px;border-radius:6px;overflow-x:auto;font-family:ui-monospace,SFMono-Regular,Consolas,Menlo,monospace;font-size:0.85rem;"><code style="background:none;padding:0;">function greet(name) {
+  return "Hello, " + name;
+}</code></pre>` },
+  { id:"C-03", cat:"Code", title:"Syntax-highlight style (colored spans)", html:
+    `<pre style="background:#282c34;color:#e6e6e6;padding:12px;border-radius:6px;overflow-x:auto;font-family:ui-monospace,SFMono-Regular,Consolas,Menlo,monospace;font-size:0.85rem;"><code style="background:none;padding:0;"><span style="color:#c678dd;">function</span> <span style="color:#61afef;">greet</span>(name) {
+  <span style="color:#c678dd;">return</span> <span style="color:#98c379;">"Hello, "</span> + name;
+}</code></pre>` },
+
+  { id:"D-01", cat:"Text formatting", title:"Bold, italic, strikethrough, underline", html:
+    `<p><b>Bold</b>, <i>italic</i>, <s>strikethrough</s>, <u>underline</u>, and <b><i>bold italic</i></b>.</p>` },
+  { id:"D-02", cat:"Text formatting", title:"Superscript & subscript", html:
+    `<p>H<sub>2</sub>O, E = mc<sup>2</sup></p>` },
+  { id:"D-03", cat:"Text formatting", title:"Text color & background color", html:
+    `<p><span style="color:#B5432D;font-weight:bold;">Red bold text</span> and <span style="background:#FFF3A3;padding:0 2px;">highlighted background text</span></p>` },
+  { id:"D-04", cat:"Text formatting", title:"Headings (H1-H4)", html:
+    `<h1>Heading 1</h1><h2>Heading 2</h2><h3>Heading 3</h3><h4>Heading 4</h4>` },
+
+  { id:"B-01", cat:"Quotes", title:"Simple blockquote", html:
+    `<blockquote style="border-left:4px solid #999;margin:0;padding:2px 0 2px 14px;color:#444;">This is a blockquote. Used to cite a source.</blockquote>` },
+  { id:"B-02", cat:"Quotes", title:"Nested blockquote", html:
+    `<blockquote style="border-left:4px solid #999;margin:0;padding:2px 0 2px 14px;color:#444;">Outer quote<blockquote style="border-left:4px solid #999;margin:0;padding:2px 0 2px 14px;color:#444;">Inner quote (nested)</blockquote></blockquote>` },
+
+  { id:"O-01", cat:"Other", title:"Link", html:
+    `<p><a href="https://example.com">Sample link text</a></p>` },
+  { id:"O-02", cat:"Other", title:"Image (inline SVG)", html:
+    `<img alt="Test image" style="max-width:160px;" src="data:image/svg+xml;utf8,${encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="160" height="90"><rect width="160" height="90" fill="%232B4162"/><text x="50%" y="50%" fill="white" font-size="16" text-anchor="middle" dy=".3em">TEST IMG</text></svg>')}">` },
+  { id:"O-03", cat:"Other", title:"Horizontal rule", html:
+    `<p>Text above</p><hr><p>Text below</p>` },
+  { id:"O-04", cat:"Other", title:"Collapsible (details/summary)", html:
+    `<details style="border:1px solid #ccc;border-radius:6px;padding:8px 12px;"><summary>Click to expand</summary><p>This is the collapsed content.</p></details>` },
+  { id:"O-05", cat:"Other", title:"Two-column layout (CSS columns)", html:
+    `<div style="columns:2;column-gap:24px;"><p>This text is meant to sit in the left column. It's laid out into two columns using the CSS columns property.</p><p>Medium often doesn't support free-form CSS layout, so this multi-column layout is a common example of something that breaks.</p></div>` },
+  { id:"O-06", cat:"Other", title:"Emoji & Unicode mix", html:
+    `<p>Emoji test 🎉📚✅ mixed with café, naïve, and 日本語 characters.</p>` },
+  { id:"O-07", cat:"Other", title:"Footnote-style (sup + list)", html:
+    `<p>This is the body text<sup>[1]</sup>.</p><ol><li id="fn1">Footnote content.</li></ol>` },
+];
+
+// ---------- validation helpers ----------
+function ok(detail){ return {status:'ok', detail: '✅ ' + detail}; }
+function partial(detail){ return {status:'partial', detail: '△ ' + detail}; }
+function broken(detail){ return {status:'broken', detail: '❌ ' + detail}; }
+
+function tagDepth(el, sel, root){
+  let depth = 0, cur = el;
+  while (cur && cur !== root.parentElement){
+    if (cur.matches && cur.matches(sel)) depth++;
+    if (cur === root) break;
+    cur = cur.parentElement;
+  }
+  return depth;
+}
+function maxTagDepth(root, sel){
+  let max = 0;
+  root.querySelectorAll(sel).forEach(el => { max = Math.max(max, tagDepth(el, sel, root)); });
+  return max;
+}
+function hasStyleProp(root, prop){
+  let found = false;
+  root.querySelectorAll('[style]').forEach(el => {
+    if (el.style[prop] && el.style[prop] !== '') found = true;
+  });
+  return found;
+}
+function ownStyleProp(el, prop){
+  return !!(el && el.style && el.style[prop] && el.style[prop] !== '');
+}
+
+const VALIDATORS = {
+  'L-01': r => { const n = r.querySelectorAll('ul > li, ol > li').length;
+    return n >= 3 ? ok(`Found ${n} li tags — recognized as a bulleted list`) : broken(`Only ${n} li tag(s) found — the bullet list may have been lost`); },
+  'L-02': r => { const d = maxTagDepth(r, 'ul, ol');
+    if (d >= 3) return ok(`Nesting depth of ${d} was preserved`);
+    if (d === 2) return partial(`Nesting depth collapsed to 2 levels (originally 3)`);
+    return broken(`Nesting was lost — it's now a flat bullet list (detected depth ${d})`); },
+  'L-03': r => { const n = r.querySelectorAll('ol > li').length;
+    return n >= 3 ? ok(`Recognized as a numbered list with ${n} items`) : broken(`Could not detect an ol/li structure`); },
+  'L-04': r => { const d = maxTagDepth(r, 'ul, ol');
+    if (d >= 2) return ok(`Nested numbered list structure was preserved`);
+    return broken(`Nesting was lost — it's now a flat list`); },
+  'L-05': r => { const cb = r.querySelectorAll('input[type=checkbox]').length;
+    if (cb >= 2) return ok(`${cb} checkbox(es) were preserved`);
+    if (r.querySelectorAll('li').length >= 2) return partial(`The list structure remains, but the checkboxes were lost`);
+    return broken(`The task list structure was lost`); },
+  'L-06': r => { const dt = r.querySelectorAll('dt').length, dd = r.querySelectorAll('dd').length;
+    if (dt >= 2 && dd >= 2) return ok(`dt/dd structure was preserved`);
+    if (r.textContent.includes('etymology') && r.textContent.includes('cognate')) return partial(`The text content remains, but the definition-list tag structure was lost`);
+    return broken(`The definition list content appears to have been lost entirely`); },
+
+  'T-01': r => { const rows = r.querySelectorAll('table tr').length, cells = r.querySelectorAll('table td, table th').length;
+    if (r.querySelector('table') && rows >= 3 && cells >= 9) return ok(`Table structure preserved (${rows} rows)`);
+    if (r.querySelector('table')) return partial(`A table element remains, but the row/cell count has decreased (${rows} rows / ${cells} cells)`);
+    return broken(`No table element detected — the table was lost`); },
+  'T-02': r => { const cs = r.querySelector('th[colspan], td[colspan]');
+    if (cs) return ok(`The colspan attribute was preserved`);
+    if (r.querySelector('table')) return partial(`The table itself remains, but the merged cell (colspan) was lost`);
+    return broken(`The whole table structure was lost`); },
+
+  'C-01': r => { const codeEl = r.querySelector('code');
+    if (!codeEl) return broken(`No code tag detected — the code styling was lost`);
+    const styledInline = ownStyleProp(codeEl,'backgroundColor') || ownStyleProp(codeEl,'fontFamily');
+    if (styledInline) return ok(`The code tag and its background color / monospace font look were preserved via inline style`);
+    const hasClass = codeEl.className && codeEl.className.trim() !== '';
+    if (hasClass) return partial(`The code tag remains, and it carries class="${codeEl.className.trim()}". Since that look depends on Medium's own stylesheet, this tool alone can't reproduce or confirm it — trust what you saw in Medium's editor`);
+    return broken(`A code tag exists but has no background color or monospace font info at all — it's barely distinguishable from plain text`); },
+  'C-02': r => { const preEl = r.querySelector('pre');
+    if (preEl) {
+      const styledInline = ownStyleProp(preEl,'backgroundColor') || ownStyleProp(preEl,'fontFamily');
+      if (styledInline) return ok(`The pre structure and its background color / monospace font look were preserved via inline style`);
+      const hasClass = preEl.className && preEl.className.trim() !== '';
+      if (hasClass) return partial(`The pre structure and class="${preEl.className.trim()}" remain, but since that look depends on Medium's own stylesheet, this tool alone can't reproduce or confirm it — trust what you saw in Medium's editor`);
+      return partial(`The pre structure remains, but the background color / monospace font look was lost`);
+    }
+    if (r.querySelector('code')) return partial(`A code tag remains, but the block structure (pre) was lost`);
+    return broken(`The code block structure was lost`); },
+  'C-03': r => { const spans = Array.from(r.querySelectorAll('pre span, code span'));
+    const inlineColored = spans.filter(s => ownStyleProp(s,'color')).length;
+    if (inlineColored > 0) return ok(`Syntax-highlight colors (inline style) were preserved on ${inlineColored} span(s)`);
+    const classedSpans = spans.filter(s => s.className && s.className.trim() !== '').length;
+    if (classedSpans > 0) return partial(`${classedSpans} colored span(s) were found with class attributes still attached, but since the color depends on Medium's own stylesheet, this tool alone can't reproduce or confirm the actual color — trust what you saw in Medium's editor`);
+    if (r.querySelector('pre') || r.querySelector('code')) return partial(`The code itself remains, but the spans used for syntax-highlight coloring were lost entirely`);
+    return broken(`The whole code block was lost`); },
+
+  'D-01': r => { const items = [
+      { label:'Bold', pass: !!r.querySelector('b, strong') },
+      { label:'Italic', pass: !!r.querySelector('i, em') },
+      { label:'Strikethrough', pass: !!r.querySelector('s, strike, del') },
+      { label:'Underline', pass: (!!r.querySelector('u') || hasStyleProp(r,'textDecoration')) },
+    ];
+    const n = items.filter(i => i.pass).length;
+    const detail = items.map(i => `${i.label}:${i.pass ? 'yes' : 'no'}`).join(' / ');
+    if (n === 4) return ok(`All 4 of bold/italic/strikethrough/underline were preserved (${detail})`);
+    if (n >= 1) return partial(`Only ${n} of 4 were preserved (${detail})`);
+    return broken(`All formatting was lost (${detail})`); },
+  'D-02': r => { const sub = !!r.querySelector('sub'), sup = !!r.querySelector('sup');
+    const detail = `Subscript:${sub ? 'yes' : 'no'} / Superscript:${sup ? 'yes' : 'no'}`;
+    if (sub && sup) return ok(`Both superscript and subscript were preserved (${detail})`);
+    if (sub || sup) return partial(`Only one of superscript/subscript was preserved (${detail})`);
+    return broken(`Both superscript and subscript were lost (${detail})`); },
+  'D-03': r => { const colored = hasStyleProp(r, 'color') || hasStyleProp(r, 'backgroundColor');
+    return colored ? ok(`The text color / background color styling was preserved`) : broken(`The text color / background color was lost — it's now plain text`); },
+  'D-04': r => { const HEADING_TAGS = new Set(['h1','h2','h3','h4','h5','h6']);
+    const labels = ['Heading 1','Heading 2','Heading 3','Heading 4'];
+    const allEls = r.querySelectorAll('*');
+    const mapping = labels.map(label => {
+      let match = null;
+      for (const el of allEls) {
+        if (el.children.length === 0 && el.textContent.trim() === label) { match = el; break; }
+      }
+      return { label, tag: match ? match.tagName.toLowerCase() : 'not found' };
+    });
+    const detail = mapping.map(m => `${m.label}→${m.tag}`).join(' / ');
+    const distinctHeadingTags = new Set(mapping.filter(m => HEADING_TAGS.has(m.tag)).map(m => m.tag));
+    const allAreHeadings = mapping.every(m => HEADING_TAGS.has(m.tag));
+    if (allAreHeadings && distinctHeadingTags.size === 4) return ok(`All 4 heading levels were preserved as distinct headings (${detail})`);
+    if (allAreHeadings) return partial(`Everything is still a heading tag, but some levels were merged together (${detail})`);
+    if (distinctHeadingTags.size > 0) return partial(`Some remain heading tags while others no longer are (${detail})`);
+    return broken(`All heading tags were lost — everything is now plain text (${detail})`); },
+
+  'B-01': r => r.querySelector('blockquote') ? ok(`The blockquote tag was preserved`) : broken(`It's no longer recognized as a quote`),
+  'B-02': r => { const d = maxTagDepth(r, 'blockquote');
+    if (d >= 2) return ok(`The nested quote (depth ${d}) was preserved`);
+    if (d === 1) return partial(`The quote remains, but the nesting was lost — it's now a single level`);
+    return broken(`The quote structure was lost`); },
+
+  'O-01': r => { const a = r.querySelector('a[href]');
+    return a && a.getAttribute('href') ? ok(`The link (a tag with href) was preserved`) : broken(`The link's href attribute was lost`); },
+  'O-02': r => r.querySelector('img') ? ok(`The img tag was preserved (Medium may re-host the image on its own CDN)`) : broken(`The image is gone — only text remains`),
+  'O-03': r => r.querySelector('hr') ? ok(`The hr divider was preserved`) : broken(`The divider was lost`),
+  'O-04': r => { if (r.querySelector('details, summary')) return ok(`The collapsible structure (details tag) was preserved`);
+    if (r.textContent.includes('Click to expand')) return partial(`The text content remains, but the collapsible behavior was lost — it's now plain text`);
+    return broken(`The collapsible block's content was lost entirely`); },
+  'O-05': r => { const cols = hasStyleProp(r, 'columnCount') || hasStyleProp(r, 'columns');
+    if (cols) return ok(`The multi-column (CSS columns) styling was preserved`);
+    if (r.textContent.includes('multi-column')) return broken(`The text content remains, but the multi-column CSS layout was lost — it's now a single column`);
+    return broken(`Both the content and the layout appear to have been lost`); },
+  'O-06': r => { const t = r.textContent;
+    return (t.includes('🎉') && t.includes('café')) ? ok(`The emoji and mixed-Unicode text came through unchanged`) : partial(`Some characters (emoji or accented/Unicode text) may have been lost`); },
+  'O-07': r => { const sup = !!r.querySelector('sup'); const list = r.querySelectorAll('li, ol > li').length > 0;
+    const detail = `Superscript (sup):${sup ? 'yes, preserved' : 'no — likely became a plain character string'} / Footnote list (ol/li):${list ? 'yes, preserved' : 'no, lost'}`;
+    if (sup && list) return ok(`Both the superscript marker and the footnote list were preserved (${detail})`);
+    if (sup || list) return partial(`Either the superscript marker or the footnote list was lost (${detail})`);
+    return broken(`The footnote-style structure was lost — it's now plain text (${detail})`); },
+};
+
+function escapeHtml(str){
+  return str.replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+const rawHtmlMap = {};
+const detailMap = {};
+
+const container = document.getElementById('testContainer');
+let lastCategory = null;
+
+TESTS.forEach(test => {
+  if (test.cat !== lastCategory) {
+    const catLabel = document.createElement('div');
+    catLabel.className = 'category-label';
+    catLabel.textContent = test.cat;
+    container.appendChild(catLabel);
+    lastCategory = test.cat;
+  }
+
+  const card = document.createElement('div');
+  card.className = 'test-card';
+  card.id = `card-${test.id}`;
+
+  card.innerHTML = `
+    <div class="test-card-head">
+      <div class="test-card-title">
+        <span class="test-id">${test.id}</span>
+        <span class="test-title">${test.title}</span>
+      </div>
+      <div class="test-controls">
+        <select class="status-select" data-id="${test.id}">
+          <option value="untested">Not tested</option>
+          <option value="ok">✅ OK</option>
+          <option value="broken">❌ Broken</option>
+          <option value="partial">△ Partial</option>
+        </select>
+        <button class="copy-btn" data-id="${test.id}">Copy</button>
+      </div>
+    </div>
+    <div class="test-card-body">
+      <div class="section-label">① Original HTML (copy from here)</div>
+      <div class="payload" id="payload-${test.id}">${test.html}</div>
+
+      <div class="section-label">② Paste result from Medium (paste here)</div>
+      <div class="paste-zone" contenteditable="true" data-id="${test.id}" data-placeholder="Paste what you copied from Medium here (Cmd/Ctrl+V)"></div>
+      <div class="auto-result" id="autoresult-${test.id}"></div>
+      <details class="raw-toggle"><summary>View captured raw HTML</summary><pre class="raw-html" id="rawhtml-${test.id}"></pre></details>
+
+      <input type="text" class="note-input" data-id="${test.id}" placeholder="Notes (anything you noticed)">
+    </div>
+  `;
+  container.appendChild(card);
+});
+
+// --- copy handling (original -> clipboard) ---
+document.querySelectorAll('.copy-btn').forEach(btn => {
+  btn.addEventListener('click', async () => {
+    const id = btn.dataset.id;
+    const el = document.getElementById(`payload-${id}`);
+    const html = el.innerHTML;
+    const text = el.innerText;
+    let done = false;
+    try {
+      if (navigator.clipboard && window.ClipboardItem) {
+        const item = new ClipboardItem({
+          'text/html': new Blob([html], { type: 'text/html' }),
+          'text/plain': new Blob([text], { type: 'text/plain' })
+        });
+        await navigator.clipboard.write([item]);
+        done = true;
+      }
+    } catch (e) { done = false; }
+    if (!done) {
+      try {
+        const range = document.createRange();
+        range.selectNodeContents(el);
+        const sel = window.getSelection();
+        sel.removeAllRanges();
+        sel.addRange(range);
+        done = document.execCommand('copy');
+        sel.removeAllRanges();
+      } catch (e) { done = false; }
+    }
+    btn.textContent = done ? 'Copied' : 'Copy failed (select manually)';
+    btn.classList.toggle('copied', done);
+    setTimeout(() => { btn.textContent = 'Copy'; btn.classList.remove('copied'); }, 1500);
+  });
+});
+
+// --- paste-back handling (Medium result -> auto judge) ---
+document.querySelectorAll('.paste-zone').forEach(zone => {
+  zone.addEventListener('paste', (e) => {
+    e.preventDefault();
+    const id = zone.dataset.id;
+    const cd = e.clipboardData || window.clipboardData;
+    const html = cd.getData('text/html');
+    const text = cd.getData('text/plain');
+    const contentHtml = (html && html.trim()) ? html : `<p>${escapeHtml(text || '')}</p>`;
+
+    zone.innerHTML = contentHtml;
+    rawHtmlMap[id] = contentHtml;
+    document.getElementById(`rawhtml-${id}`).textContent = contentHtml;
+
+    let result;
+    try {
+      const stage = document.createElement('div');
+      stage.innerHTML = contentHtml;
+      const validator = VALIDATORS[id];
+      result = validator ? validator(stage) : partial('No auto-grading logic exists for this item yet — please grade it manually');
+    } catch (err) {
+      result = partial(`An error occurred while grading (${err.message}). The content was still pasted, so please set the status manually`);
+    }
+
+    detailMap[id] = result.detail;
+
+    const sel = document.querySelector(`.status-select[data-id="${id}"]`);
+    sel.value = result.status;
+    sel.dispatchEvent(new Event('change'));
+
+    const resultBox = document.getElementById(`autoresult-${id}`);
+    resultBox.innerHTML = '';
+    const badgeEl = document.createElement('span');
+    badgeEl.className = `badge ${result.status}`;
+    badgeEl.textContent = result.status === 'ok' ? 'OK' : result.status === 'broken' ? 'Broken' : 'Partial';
+    const textEl = document.createElement('div');
+    textEl.className = 'auto-result-text';
+    // result.detail may mention tag names like "<code>" as prose, so we insert it via
+    // textContent (not innerHTML) to make sure it's never interpreted as a real HTML tag
+    textEl.textContent = result.detail;
+    resultBox.appendChild(badgeEl);
+    resultBox.appendChild(textEl);
+  });
+});
+
+// --- status handling ---
+function updateStats() {
+  const counts = { ok:0, broken:0, partial:0, untested:0 };
+  document.querySelectorAll('.status-select').forEach(sel => counts[sel.value]++);
+  const bar = document.getElementById('statBar');
+  bar.innerHTML = `
+    <span class="stat-pill"><span class="stat-dot ok"></span>OK: ${counts.ok}</span>
+    <span class="stat-pill"><span class="stat-dot broken"></span>Broken: ${counts.broken}</span>
+    <span class="stat-pill"><span class="stat-dot partial"></span>Partial: ${counts.partial}</span>
+    <span class="stat-pill"><span class="stat-dot untested"></span>Not tested: ${counts.untested}</span>
+  `;
+}
+document.querySelectorAll('.status-select').forEach(sel => {
+  sel.addEventListener('change', () => {
+    const card = document.getElementById(`card-${sel.dataset.id}`);
+    card.classList.remove('status-ok', 'status-broken', 'status-partial');
+    sel.classList.remove('status-ok', 'status-broken', 'status-partial');
+    if (sel.value !== 'untested') {
+      card.classList.add(`status-${sel.value}`);
+      sel.classList.add(`status-${sel.value}`);
+    }
+    updateStats();
+  });
+});
+updateStats();
+
+// --- export ---
+document.getElementById('exportBtn').addEventListener('click', () => {
+  const statusLabel = { ok:'✅ OK', broken:'❌ Broken', partial:'△ Partial', untested:'— Not tested' };
+  let lines = [`# Medium Paste Compatibility Check Results`, ``];
+  let currentCat = null;
+  TESTS.forEach(test => {
+    if (test.cat !== currentCat) { lines.push(`## ${test.cat}`, ``); currentCat = test.cat; }
+    const sel = document.querySelector(`.status-select[data-id="${test.id}"]`);
+    const note = document.querySelector(`.note-input[data-id="${test.id}"]`).value.trim();
+    lines.push(`- **[${test.id}] ${test.title}**: ${statusLabel[sel.value]}${note ? ` — ${note}` : ''}`);
+    const detail = detailMap[test.id];
+    if (detail) {
+      // strip the leading ✅/△/❌ since it's redundant with the status label above
+      const cleaned = detail.replace(/^(✅|△|❌)\s*/, '');
+      lines.push(`  - Reason: ${cleaned}`);
+    }
+  });
+
+  // Raw HTML is grouped in its own section at the end (embedding a code block inside a
+  // bullet list item can trip up some Markdown renderers and swallow following lines)
+  const rawEntries = TESTS.filter(t => rawHtmlMap[t.id]);
+  if (rawEntries.length > 0) {
+    lines.push(``, `---`, ``, `## Appendix: raw HTML captured from the paste-back`, ``);
+    rawEntries.forEach(t => {
+      const raw = rawHtmlMap[t.id];
+      const snippet = raw.length > 200 ? raw.slice(0, 200) + '…' : raw;
+      lines.push(`### [${t.id}] ${t.title}`, ``, '```html', snippet, '```', ``);
+    });
+  }
+
+  document.getElementById('exportText').value = lines.join('\n');
+  document.getElementById('exportModal').style.display = 'flex';
+});
+document.getElementById('modalCloseBtn').addEventListener('click', () => {
+  document.getElementById('exportModal').style.display = 'none';
+});
+document.getElementById('modalCopyBtn').addEventListener('click', async () => {
+  const ta = document.getElementById('exportText');
+  ta.select();
+  try { await navigator.clipboard.writeText(ta.value); } catch (e) { document.execCommand('copy'); }
+});
+document.getElementById('resetBtn').addEventListener('click', () => {
+  if (!confirm('Reset all statuses, pasted-back content, and notes?')) return;
+  document.querySelectorAll('.status-select').forEach(sel => { sel.value = 'untested'; sel.dispatchEvent(new Event('change')); });
+  document.querySelectorAll('.note-input').forEach(inp => inp.value = '');
+  document.querySelectorAll('.paste-zone').forEach(z => z.innerHTML = '');
+  document.querySelectorAll('.auto-result').forEach(a => a.innerHTML = '');
+  document.querySelectorAll('.raw-html').forEach(p => p.textContent = '');
+  Object.keys(rawHtmlMap).forEach(k => delete rawHtmlMap[k]);
+  Object.keys(detailMap).forEach(k => delete detailMap[k]);
+});
+</script>
+
+</body>
+</html>
