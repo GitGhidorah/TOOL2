@@ -1,0 +1,605 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Medium貼り付け互換性チェッカー</title>
+<style>
+  :root{
+    --bg:#F4F6F5;
+    --surface:#FFFFFF;
+    --ink:#1C2321;
+    --muted:#5C6A6C;
+    --line:#DCE3E1;
+    --brand:#2B4162;
+    --brand-ink:#FFFFFF;
+    --ok:#2F7D5C;
+    --ok-bg:#E7F3ED;
+    --broken:#C1443A;
+    --broken-bg:#FBEAE8;
+    --partial:#B98900;
+    --partial-bg:#FBF3DD;
+    --untested:#9AA5A9;
+    --untested-bg:#EDEFEF;
+    --mono: ui-monospace, "SF Mono", "Consolas", "Menlo", monospace;
+    --sans: -apple-system, "Hiragino Sans", "Hiragino Kaku Gothic ProN", "Yu Gothic", "Meiryo", sans-serif;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    background:var(--bg);
+    color:var(--ink);
+    font-family:var(--sans);
+    line-height:1.7;
+    padding-bottom:80px;
+  }
+  header.tool-header{
+    background:var(--brand);
+    color:var(--brand-ink);
+    padding:28px 20px 22px;
+    position:sticky;
+    top:0;
+    z-index:20;
+  }
+  .header-inner{ max-width:920px; margin:0 auto; }
+  header.tool-header h1{ margin:0 0 6px; font-size:1.35rem; letter-spacing:0.02em; }
+  header.tool-header p{ margin:0; font-size:0.88rem; color:#C7D2DE; }
+  .stat-bar{ display:flex; gap:14px; margin-top:14px; flex-wrap:wrap; font-family:var(--mono); font-size:0.78rem; }
+  .stat-pill{ background:rgba(255,255,255,0.1); border:1px solid rgba(255,255,255,0.25); border-radius:20px; padding:4px 12px; display:flex; align-items:center; gap:6px; }
+  .stat-dot{width:8px;height:8px;border-radius:50%;display:inline-block;}
+  .stat-dot.ok{background:#5CD3A0;}
+  .stat-dot.broken{background:#F08E85;}
+  .stat-dot.partial{background:#F0CC5A;}
+  .stat-dot.untested{background:#C8CFCF;}
+
+  main{ max-width:920px; margin:0 auto; padding:24px 20px 0; }
+  .howto{ background:var(--surface); border:1px solid var(--line); border-left:4px solid var(--brand); border-radius:6px; padding:16px 18px; margin-bottom:28px; font-size:0.92rem; }
+  .howto h2{ margin:0 0 8px; font-size:0.95rem; }
+  .howto ol{margin:0; padding-left:20px;}
+  .howto li{margin-bottom:4px;}
+  .howto .small{ color:var(--muted); font-size:0.82rem; margin-top:8px; }
+
+  .category-label{ font-family:var(--mono); font-size:0.75rem; letter-spacing:0.08em; color:var(--muted); text-transform:uppercase; margin:32px 0 10px; border-bottom:1px solid var(--line); padding-bottom:6px; }
+
+  .test-card{ background:var(--surface); border:1px solid var(--line); border-radius:8px; margin-bottom:18px; overflow:hidden; }
+  .test-card.status-ok{border-color:var(--ok);}
+  .test-card.status-broken{border-color:var(--broken);}
+  .test-card.status-partial{border-color:var(--partial);}
+
+  .test-card-head{ display:flex; align-items:center; justify-content:space-between; gap:10px; padding:10px 14px; background:#FAFBFA; border-bottom:1px solid var(--line); flex-wrap:wrap; }
+  .test-card-title{ display:flex; align-items:baseline; gap:8px; }
+  .test-id{ font-family:var(--mono); font-size:0.72rem; color:var(--muted); background:var(--untested-bg); padding:2px 6px; border-radius:4px; }
+  .test-title{ font-weight:600; font-size:0.92rem; }
+  .test-controls{ display:flex; align-items:center; gap:8px; }
+  select.status-select{ font-family:var(--sans); font-size:0.78rem; padding:4px 6px; border-radius:4px; border:1px solid var(--line); background:var(--untested-bg); color:var(--ink); }
+  select.status-select.status-ok{background:var(--ok-bg); border-color:var(--ok); color:var(--ok);}
+  select.status-select.status-broken{background:var(--broken-bg); border-color:var(--broken); color:var(--broken);}
+  select.status-select.status-partial{background:var(--partial-bg); border-color:var(--partial); color:var(--partial);}
+
+  button.copy-btn{ font-family:var(--mono); font-size:0.75rem; background:var(--brand); color:#fff; border:none; padding:6px 12px; border-radius:5px; cursor:pointer; }
+  button.copy-btn:hover{opacity:0.88;}
+  button.copy-btn.copied{background:var(--ok);}
+
+  .test-card-body{ padding:16px 18px; }
+  .section-label{ font-family:var(--mono); font-size:0.7rem; color:var(--muted); text-transform:uppercase; letter-spacing:0.06em; margin:14px 0 6px; }
+  .note-input{ width:100%; margin-top:10px; font-family:var(--sans); font-size:0.82rem; padding:6px 8px; border:1px solid var(--line); border-radius:4px; color:var(--muted); }
+
+  .paste-zone{ min-height:48px; border:1.5px dashed var(--line); border-radius:6px; padding:10px 12px; font-size:0.9rem; background:#FCFDFD; }
+  .paste-zone:focus{ outline:none; border-color:var(--brand); background:#fff; }
+  .paste-zone:empty:before{ content: attr(data-placeholder); color:#A6AEAF; }
+
+  .auto-result{ margin-top:8px; font-size:0.85rem; }
+  .auto-result-text{ margin-top:4px; width:100%; max-width:100%; overflow-wrap:anywhere; word-break:break-word; white-space:normal; }
+  .badge{ font-family:var(--mono); font-size:0.72rem; padding:2px 8px; border-radius:12px; white-space:nowrap; flex-shrink:0; }
+  .badge.ok{ background:var(--ok-bg); color:var(--ok); }
+  .badge.broken{ background:var(--broken-bg); color:var(--broken); }
+  .badge.partial{ background:var(--partial-bg); color:var(--partial); }
+
+  .raw-toggle{ margin-top:8px; font-size:0.78rem; color:var(--muted); }
+  .raw-toggle summary{ cursor:pointer; }
+  .raw-html{ font-family:var(--mono); font-size:0.72rem; background:#F5F5F3; border:1px solid var(--line); border-radius:4px; padding:8px; margin-top:6px; white-space:pre-wrap; word-break:break-all; max-height:180px; overflow:auto; }
+
+  /* --- rendered test content styles (this is what gets copied) --- */
+  .payload table{border-collapse:collapse; width:100%;}
+  .payload table th, .payload table td{border:1px solid #999; padding:6px 10px;}
+  .payload table th{background:#eee;}
+  .payload blockquote{border-left:4px solid #999; margin:0; padding:2px 0 2px 14px; color:#444;}
+  .payload pre{background:#282c34; color:#e6e6e6; padding:12px; border-radius:6px; overflow-x:auto; font-family:var(--mono); font-size:0.85rem;}
+  .payload code{background:#eee; padding:1px 5px; border-radius:3px; font-family:var(--mono); font-size:0.9em;}
+  .payload pre code{background:none; padding:0;}
+  .payload .col-2{columns:2; column-gap:24px;}
+  .payload details{border:1px solid #ccc; border-radius:6px; padding:8px 12px;}
+  .payload .hl{background:#FFF3A3; padding:0 2px;}
+  .payload .colored{color:#B5432D; font-weight:bold;}
+
+  footer.export-bar{ position:fixed; bottom:0; left:0; right:0; background:var(--brand); padding:12px 20px; display:flex; justify-content:center; gap:12px; z-index:20; }
+  footer.export-bar button{ font-family:var(--mono); font-size:0.82rem; padding:8px 16px; border-radius:5px; border:none; cursor:pointer; }
+  #exportBtn{background:#fff; color:var(--brand); font-weight:600;}
+  #resetBtn{background:transparent; color:#C7D2DE; border:1px solid rgba(255,255,255,0.35);}
+
+  #exportModal{ display:none; position:fixed; inset:0; background:rgba(20,25,25,0.55); z-index:50; align-items:center; justify-content:center; padding:20px; }
+  #exportModal .modal-box{ background:#fff; border-radius:8px; max-width:680px; width:100%; max-height:80vh; display:flex; flex-direction:column; padding:18px; }
+  #exportModal h3{margin:0 0 10px;}
+  #exportModal textarea{ flex:1; min-height:300px; font-family:var(--mono); font-size:0.8rem; padding:10px; border:1px solid var(--line); border-radius:6px; resize:vertical; }
+  #exportModal .modal-actions{ display:flex; justify-content:flex-end; gap:10px; margin-top:12px; }
+  #exportModal button{ font-family:var(--mono); font-size:0.8rem; padding:7px 14px; border-radius:5px; border:1px solid var(--line); background:#fff; cursor:pointer; }
+  #exportModal button.primary{background:var(--brand); color:#fff; border-color:var(--brand);}
+</style>
+</head>
+<body>
+
+<header class="tool-header">
+  <div class="header-inner">
+    <h1>Medium貼り付け互換性チェッカー</h1>
+    <p>①「コピー」で元のHTMLを書式付きコピー → ②Mediumにペースト → ③その結果をこのツールに貼り戻すと、自動でOK/NG判定します。</p>
+    <div class="stat-bar" id="statBar"></div>
+  </div>
+</header>
+
+<main>
+  <div class="howto">
+    <h2>使い方</h2>
+    <ol>
+      <li>各カードの「コピー」ボタンでリッチHTMLとしてコピー</li>
+      <li>Mediumの編集画面にペースト（Cmd/Ctrl+V）</li>
+      <li>Medium上で崩れ方を確認したら、<b>その表示範囲を選択してコピー</b>し直す</li>
+      <li>このツールの「Mediumからの貼り戻し」欄をクリックしてペースト（Cmd/Ctrl+V）</li>
+      <li>構造を自動解析し、OK / 崩れる / 部分的 を判定してバッジ表示します（判定根拠つき）</li>
+      <li>自動判定が実態と違う場合はセレクトで手動修正可能。最後に「結果をエクスポート」でMarkdownとして書き出せます</li>
+    </ol>
+    <div class="small">※ 判定はペースト時に取得できるHTML構造（タグ・ネスト・属性）を解析する簡易ロジックです。目視でのダブルチェックを推奨します。<br>※ 重要な注意点：Mediumは見た目をMedium独自のCSSクラス（インラインstyleではない）で表現していることがあります。その場合「Mediumの編集画面ではきれいに見えるのに、そこから外部にコピーするとクラスに対応するCSSが無く素の文字に見える」という現象が起きます。これは①「Mediumに貼った時点でどう見えるか」の問題ではなく、②「Mediumから外部へコピーし直す時にどう見えるか」という別の問題です。「部分的」判定でclass名が表示されている場合はこのケースなので、Medium編集画面上の見た目を優先して判断してください。</div>
+  </div>
+
+  <div id="testContainer"></div>
+</main>
+
+<footer class="export-bar">
+  <button id="exportBtn">結果をエクスポート</button>
+  <button id="resetBtn">全ステータスをリセット</button>
+</footer>
+
+<div id="exportModal">
+  <div class="modal-box">
+    <h3>検証結果（Markdown）</h3>
+    <textarea id="exportText" readonly></textarea>
+    <div class="modal-actions">
+      <button id="modalCopyBtn">クリップボードにコピー</button>
+      <button id="modalCloseBtn" class="primary">閉じる</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const TESTS = [
+  { id:"L-01", cat:"リスト", title:"箇条書き（1階層）", html:
+    `<ul><li>りんご</li><li>みかん</li><li>ぶどう</li></ul>` },
+  { id:"L-02", cat:"リスト", title:"箇条書き（2階層以上のネスト）", html:
+    `<ul><li>果物
+      <ul><li>りんご
+        <ul><li>ふじ</li><li>紅玉</li></ul>
+      </li><li>みかん</li></ul>
+    </li><li>野菜<ul><li>にんじん</li></ul></li></ul>` },
+  { id:"L-03", cat:"リスト", title:"番号付きリスト（フラット）", html:
+    `<ol><li>手順1</li><li>手順2</li><li>手順3</li></ol>` },
+  { id:"L-04", cat:"リスト", title:"番号付きリスト（ネスト）", html:
+    `<ol><li>準備<ol><li>材料を揃える</li><li>道具を揃える</li></ol></li><li>調理</li></ol>` },
+  { id:"L-05", cat:"リスト", title:"タスクリスト（チェックボックス付き）", html:
+    `<ul style="list-style:none;padding-left:0;">
+      <li><input type="checkbox" checked disabled> 完了したタスク</li>
+      <li><input type="checkbox" disabled> 未完了のタスク</li>
+    </ul>` },
+  { id:"L-06", cat:"リスト", title:"定義リスト（dl/dt/dd）", html:
+    `<dl><dt>etymology</dt><dd>語源。ある単語がどこから来たかという歴史。</dd>
+      <dt>cognate</dt><dd>同じ祖語に由来する同系語。</dd></dl>` },
+
+  { id:"T-01", cat:"テーブル", title:"シンプルな表", html:
+    `<table style="border-collapse:collapse;width:100%;"><thead><tr><th style="border:1px solid #999;padding:6px 10px;background:#eee;">単語</th><th style="border:1px solid #999;padding:6px 10px;background:#eee;">語源</th><th style="border:1px solid #999;padding:6px 10px;background:#eee;">意味</th></tr></thead>
+     <tbody><tr><td style="border:1px solid #999;padding:6px 10px;">etymology</td><td style="border:1px solid #999;padding:6px 10px;">ギリシャ語 etymon</td><td style="border:1px solid #999;padding:6px 10px;">語源</td></tr>
+     <tr><td style="border:1px solid #999;padding:6px 10px;">cognate</td><td style="border:1px solid #999;padding:6px 10px;">ラテン語 cognatus</td><td style="border:1px solid #999;padding:6px 10px;">同系語</td></tr></tbody></table>` },
+  { id:"T-02", cat:"テーブル", title:"セル結合を含む表", html:
+    `<table style="border-collapse:collapse;width:100%;"><tr><th colspan="2" style="border:1px solid #999;padding:6px 10px;background:#eee;">見出し（結合セル）</th></tr>
+     <tr><td style="border:1px solid #999;padding:6px 10px;">A</td><td style="border:1px solid #999;padding:6px 10px;">B</td></tr></table>` },
+
+  { id:"C-01", cat:"コード", title:"インラインコード", html:
+    `<p>変数は <code style="background:#eee;padding:1px 5px;border-radius:3px;font-family:ui-monospace,SFMono-Regular,Consolas,Menlo,monospace;font-size:0.9em;">const x = 1;</code> のように書きます。</p>` },
+  { id:"C-02", cat:"コード", title:"複数行コードブロック", html:
+    `<pre style="background:#282c34;color:#e6e6e6;padding:12px;border-radius:6px;overflow-x:auto;font-family:ui-monospace,SFMono-Regular,Consolas,Menlo,monospace;font-size:0.85rem;"><code style="background:none;padding:0;">function greet(name) {
+  return "Hello, " + name;
+}</code></pre>` },
+  { id:"C-03", cat:"コード", title:"シンタックスハイライト風（span色付け）", html:
+    `<pre style="background:#282c34;color:#e6e6e6;padding:12px;border-radius:6px;overflow-x:auto;font-family:ui-monospace,SFMono-Regular,Consolas,Menlo,monospace;font-size:0.85rem;"><code style="background:none;padding:0;"><span style="color:#c678dd;">function</span> <span style="color:#61afef;">greet</span>(name) {
+  <span style="color:#c678dd;">return</span> <span style="color:#98c379;">"Hello, "</span> + name;
+}</code></pre>` },
+
+  { id:"D-01", cat:"テキスト装飾", title:"太字・斜体・取り消し線・下線", html:
+    `<p><b>太字</b>、<i>斜体</i>、<s>取り消し線</s>、<u>下線</u>、そして<b><i>太字斜体</i></b>。</p>` },
+  { id:"D-02", cat:"テキスト装飾", title:"上付き・下付き文字", html:
+    `<p>H<sub>2</sub>O、E = mc<sup>2</sup></p>` },
+  { id:"D-03", cat:"テキスト装飾", title:"文字色・背景色", html:
+    `<p><span style="color:#B5432D;font-weight:bold;">赤い太字テキスト</span> と <span style="background:#FFF3A3;padding:0 2px;">背景色付きハイライト</span></p>` },
+  { id:"D-04", cat:"テキスト装飾", title:"見出し（H1〜H4）", html:
+    `<h1>見出し1</h1><h2>見出し2</h2><h3>見出し3</h3><h4>見出し4</h4>` },
+
+  { id:"B-01", cat:"引用", title:"通常の引用", html:
+    `<blockquote style="border-left:4px solid #999;margin:0;padding:2px 0 2px 14px;color:#444;">これは引用文です。出典を示す際に使います。</blockquote>` },
+  { id:"B-02", cat:"引用", title:"ネストした引用", html:
+    `<blockquote style="border-left:4px solid #999;margin:0;padding:2px 0 2px 14px;color:#444;">外側の引用<blockquote style="border-left:4px solid #999;margin:0;padding:2px 0 2px 14px;color:#444;">内側の引用（ネスト）</blockquote></blockquote>` },
+
+  { id:"O-01", cat:"その他", title:"リンク", html:
+    `<p><a href="https://example.com">サンプルリンクのテキスト</a></p>` },
+  { id:"O-02", cat:"その他", title:"画像（インラインSVG）", html:
+    `<img alt="テスト画像" style="max-width:160px;" src="data:image/svg+xml;utf8,${encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="160" height="90"><rect width="160" height="90" fill="%232B4162"/><text x="50%" y="50%" fill="white" font-size="16" text-anchor="middle" dy=".3em">TEST IMG</text></svg>')}">` },
+  { id:"O-03", cat:"その他", title:"水平線", html:
+    `<p>上のテキスト</p><hr><p>下のテキスト</p>` },
+  { id:"O-04", cat:"その他", title:"折りたたみ（details/summary）", html:
+    `<details style="border:1px solid #ccc;border-radius:6px;padding:8px 12px;"><summary>クリックで開く</summary><p>折りたたみ内のテキストです。</p></details>` },
+  { id:"O-05", cat:"その他", title:"2カラムレイアウト（CSS columns）", html:
+    `<div style="columns:2;column-gap:24px;"><p>これは左カラムに入るはずのテキストです。CSSのcolumnsプロパティで2段組みにしています。</p><p>Mediumは自由なCSSレイアウトをサポートしないことが多く、この段組みは崩れやすい代表例です。</p></div>` },
+  { id:"O-06", cat:"その他", title:"絵文字・全角半角混在", html:
+    `<p>絵文字テスト 🎉📚✅ と Half-width123 全角ＡＢＣ１２３の混在。</p>` },
+  { id:"O-07", cat:"その他", title:"脚注風（sup + リスト）", html:
+    `<p>これは本文です<sup>[1]</sup>。</p><ol><li id="fn1">脚注の内容です。</li></ol>` },
+];
+
+// ---------- validation helpers ----------
+function ok(detail){ return {status:'ok', detail: '✅ ' + detail}; }
+function partial(detail){ return {status:'partial', detail: '△ ' + detail}; }
+function broken(detail){ return {status:'broken', detail: '❌ ' + detail}; }
+
+function tagDepth(el, sel, root){
+  let depth = 0, cur = el;
+  while (cur && cur !== root.parentElement){
+    if (cur.matches && cur.matches(sel)) depth++;
+    if (cur === root) break;
+    cur = cur.parentElement;
+  }
+  return depth;
+}
+function maxTagDepth(root, sel){
+  let max = 0;
+  root.querySelectorAll(sel).forEach(el => { max = Math.max(max, tagDepth(el, sel, root)); });
+  return max;
+}
+function hasStyleProp(root, prop){
+  let found = false;
+  root.querySelectorAll('[style]').forEach(el => {
+    if (el.style[prop] && el.style[prop] !== '') found = true;
+  });
+  return found;
+}
+function ownStyleProp(el, prop){
+  return !!(el && el.style && el.style[prop] && el.style[prop] !== '');
+}
+
+const VALIDATORS = {
+  'L-01': r => { const n = r.querySelectorAll('ul > li, ol > li').length;
+    return n >= 3 ? ok(`liタグが${n}個検出され、箇条書きとして認識されました`) : broken(`liタグが${n}個しか検出できず、箇条書きが失われている可能性があります`); },
+  'L-02': r => { const d = maxTagDepth(r, 'ul, ol');
+    if (d >= 3) return ok(`ネスト深さ${d}を維持できています`);
+    if (d === 2) return partial(`ネスト深さが2段までに縮退しています（元は3段）`);
+    return broken(`ネストが失われ、フラットな箇条書きになっています（検出深さ${d}）`); },
+  'L-03': r => { const n = r.querySelectorAll('ol > li').length;
+    return n >= 3 ? ok(`番号付きリストとして${n}項目認識されました`) : broken(`olタグ・liタグの構造が検出できません`); },
+  'L-04': r => { const d = maxTagDepth(r, 'ul, ol');
+    if (d >= 2) return ok(`ネストした番号付きリストを維持できています`);
+    return broken(`ネストが失われ、フラットなリストになっています`); },
+  'L-05': r => { const cb = r.querySelectorAll('input[type=checkbox]').length;
+    if (cb >= 2) return ok(`チェックボックス${cb}個が保持されています`);
+    if (r.querySelectorAll('li').length >= 2) return partial(`リスト構造は残るがチェックボックスが失われています`);
+    return broken(`タスクリストの構造が失われています`); },
+  'L-06': r => { const dt = r.querySelectorAll('dt').length, dd = r.querySelectorAll('dd').length;
+    if (dt >= 2 && dd >= 2) return ok(`dtタグ・ddタグの構造が維持されています`);
+    if (r.textContent.includes('etymology') && r.textContent.includes('cognate')) return partial(`テキスト内容は残るが定義リストのタグ構造は失われています`);
+    return broken(`定義リストの内容ごと失われている可能性があります`); },
+
+  'T-01': r => { const rows = r.querySelectorAll('table tr').length, cells = r.querySelectorAll('table td, table th').length;
+    if (r.querySelector('table') && rows >= 3 && cells >= 9) return ok(`表構造（${rows}行）を維持できています`);
+    if (r.querySelector('table')) return partial(`table要素は残るが行・セル数が減少しています（${rows}行 / ${cells}セル）`);
+    return broken(`table要素が検出できず、表が失われています`); },
+  'T-02': r => { const cs = r.querySelector('th[colspan], td[colspan]');
+    if (cs) return ok(`colspan属性が維持されています`);
+    if (r.querySelector('table')) return partial(`表自体は残るがセル結合(colspan)は失われています`);
+    return broken(`表構造ごと失われています`); },
+
+  'C-01': r => { const codeEl = r.querySelector('code');
+    if (!codeEl) return broken(`codeタグが検出できず、コード表示が失われています`);
+    const styledInline = ownStyleProp(codeEl,'backgroundColor') || ownStyleProp(codeEl,'fontFamily');
+    if (styledInline) return ok(`codeタグと背景色/等幅フォントの見た目がインラインstyleで維持されています`);
+    const hasClass = codeEl.className && codeEl.className.trim() !== '';
+    if (hasClass) return partial(`codeタグは残り、class="${codeEl.className.trim()}"も付与されています。Medium独自のスタイルシートに依存した見た目のため、このツール単体では再現・確認できません（Medium編集画面上の見た目を優先してください）`);
+    return broken(`codeタグはあるが背景色・等幅フォントの情報が一切なく、地の文とほぼ区別がつきません`); },
+  'C-02': r => { const preEl = r.querySelector('pre');
+    if (preEl) {
+      const styledInline = ownStyleProp(preEl,'backgroundColor') || ownStyleProp(preEl,'fontFamily');
+      if (styledInline) return ok(`preタグと背景色/等幅フォントの見た目がインラインstyleで維持されています`);
+      const hasClass = preEl.className && preEl.className.trim() !== '';
+      if (hasClass) return partial(`preタグとclass="${preEl.className.trim()}"は残っていますが、Medium独自のスタイルシート依存のため、このツール単体では見た目を再現・確認できません（Medium編集画面上の見た目を優先してください）`);
+      return partial(`preタグは残るが、背景色や等幅フォントなどの見た目のスタイルが失われています`);
+    }
+    if (r.querySelector('code')) return partial(`codeタグは残るがブロック構造(preタグ)が失われています`);
+    return broken(`コードブロックの構造が失われています`); },
+  'C-03': r => { const spans = Array.from(r.querySelectorAll('pre span, code span'));
+    const inlineColored = spans.filter(s => ownStyleProp(s,'color')).length;
+    if (inlineColored > 0) return ok(`シンタックスハイライトの色指定（インラインstyle）が${inlineColored}箇所維持されています`);
+    const classedSpans = spans.filter(s => s.className && s.className.trim() !== '').length;
+    if (classedSpans > 0) return partial(`色付けspanが${classedSpans}個検出されclass属性も残っていますが、Medium独自のスタイルシート依存の色のため、このツール単体では発色を再現・確認できません（Medium編集画面上の見た目を優先してください）`);
+    if (r.querySelector('pre') || r.querySelector('code')) return partial(`コード自体は残るが、色分け(シンタックスハイライト)のためのspan要素ごと失われています`);
+    return broken(`コードブロックごと失われています`); },
+
+  'D-01': r => { const items = [
+      { label:'太字', pass: !!r.querySelector('b, strong') },
+      { label:'斜体', pass: !!r.querySelector('i, em') },
+      { label:'取消線', pass: !!r.querySelector('s, strike, del') },
+      { label:'下線', pass: (!!r.querySelector('u') || hasStyleProp(r,'textDecoration')) },
+    ];
+    const n = items.filter(i => i.pass).length;
+    const detail = items.map(i => `${i.label}:${i.pass ? '○' : '✕'}`).join(' / ');
+    if (n === 4) return ok(`太字・斜体・取消線・下線の4種すべて維持されています（${detail}）`);
+    if (n >= 1) return partial(`4種中${n}種のみ維持されています（${detail}）`);
+    return broken(`装飾がすべて失われています（${detail}）`); },
+  'D-02': r => { const sub = !!r.querySelector('sub'), sup = !!r.querySelector('sup');
+    const detail = `下付き(sub):${sub ? '○' : '✕'} / 上付き(sup):${sup ? '○' : '✕'}`;
+    if (sub && sup) return ok(`上付き・下付き文字とも維持されています（${detail}）`);
+    if (sub || sup) return partial(`上付き・下付きの一方のみ維持されています（${detail}）`);
+    return broken(`上付き・下付き文字が失われています（${detail}）`); },
+  'D-03': r => { const colored = hasStyleProp(r, 'color') || hasStyleProp(r, 'backgroundColor');
+    return colored ? ok(`文字色/背景色のスタイルが維持されています`) : broken(`文字色・背景色の指定が失われ、地の文になっています`); },
+  'D-04': r => { const HEADING_TAGS = new Set(['h1','h2','h3','h4','h5','h6']);
+    const labels = ['見出し1','見出し2','見出し3','見出し4'];
+    const allEls = r.querySelectorAll('*');
+    const mapping = labels.map(label => {
+      let match = null;
+      for (const el of allEls) {
+        if (el.children.length === 0 && el.textContent.trim() === label) { match = el; break; }
+      }
+      return { label, tag: match ? match.tagName.toLowerCase() : '見つからず' };
+    });
+    const detail = mapping.map(m => `${m.label}→${m.tag}`).join(' / ');
+    const distinctHeadingTags = new Set(mapping.filter(m => HEADING_TAGS.has(m.tag)).map(m => m.tag));
+    const allAreHeadings = mapping.every(m => HEADING_TAGS.has(m.tag));
+    if (allAreHeadings && distinctHeadingTags.size === 4) return ok(`4段階すべてが個別の見出しレベルとして維持されています（${detail}）`);
+    if (allAreHeadings) return partial(`全て見出しタグではあるが、一部レベルが統合されています（${detail}）`);
+    if (distinctHeadingTags.size > 0) return partial(`一部は見出しタグのまま、一部は見出しでなくなっています（${detail}）`);
+    return broken(`見出しタグがすべて失われ、地の文になっています（${detail}）`); },
+
+  'B-01': r => r.querySelector('blockquote') ? ok(`blockquoteタグが維持されています`) : broken(`引用として認識されていません`),
+  'B-02': r => { const d = maxTagDepth(r, 'blockquote');
+    if (d >= 2) return ok(`ネストした引用（深さ${d}）を維持できています`);
+    if (d === 1) return partial(`引用は残るがネスト構造は失われ1段のみになっています`);
+    return broken(`引用の構造が失われています`); },
+
+  'O-01': r => { const a = r.querySelector('a[href]');
+    return a && a.getAttribute('href') ? ok(`aタグ（href属性）によるリンクが維持されています`) : broken(`リンクのhref属性が失われています`); },
+  'O-02': r => r.querySelector('img') ? ok(`imgタグが維持されています（Medium側でホストし直される場合あり）`) : broken(`画像が消失し、テキストのみになっています`),
+  'O-03': r => r.querySelector('hr') ? ok(`hrタグによる区切り線が維持されています`) : broken(`区切り線が失われています`),
+  'O-04': r => { if (r.querySelector('details, summary')) return ok(`折りたたみ構造(detailsタグ)が維持されています`);
+    if (r.textContent.includes('クリックで開く')) return partial(`テキスト内容は残るが折りたたみの機能は失われ、通常テキスト化しています`);
+    return broken(`折りたたみブロックの内容ごと失われています`); },
+  'O-05': r => { const cols = hasStyleProp(r, 'columnCount') || hasStyleProp(r, 'columns');
+    if (cols) return ok(`段組み(CSS columns)のスタイルが維持されています`);
+    if (r.textContent.includes('段組み')) return broken(`テキスト内容は残るが、段組みレイアウト(CSS)は失われ通常の1カラムになっています`);
+    return broken(`内容・レイアウトともに失われています`); },
+  'O-06': r => { const t = r.textContent;
+    return (t.includes('🎉') && t.includes('全角')) ? ok(`絵文字・全角半角混在テキストがそのまま維持されています`) : partial(`一部の文字（絵文字や全角文字）が失われた可能性があります`); },
+  'O-07': r => { const sup = !!r.querySelector('sup'); const list = r.querySelectorAll('li, ol > li').length > 0;
+    const detail = `上付き番号(sup):${sup ? '○ 維持' : '✕ 失われ、ただの文字列になっている可能性'} / 脚注リスト(ol・li):${list ? '○ 維持' : '✕ 失われている'}`;
+    if (sup && list) return ok(`上付き番号と脚注リストの両方が維持されています（${detail}）`);
+    if (sup || list) return partial(`上付き番号・脚注リストのどちらか一方が失われています（${detail}）`);
+    return broken(`脚注的な構造が失われ、地の文になっています（${detail}）`); },
+};
+
+function escapeHtml(str){
+  return str.replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+const rawHtmlMap = {};
+const detailMap = {};
+
+const container = document.getElementById('testContainer');
+let lastCategory = null;
+
+TESTS.forEach(test => {
+  if (test.cat !== lastCategory) {
+    const catLabel = document.createElement('div');
+    catLabel.className = 'category-label';
+    catLabel.textContent = test.cat;
+    container.appendChild(catLabel);
+    lastCategory = test.cat;
+  }
+
+  const card = document.createElement('div');
+  card.className = 'test-card';
+  card.id = `card-${test.id}`;
+
+  card.innerHTML = `
+    <div class="test-card-head">
+      <div class="test-card-title">
+        <span class="test-id">${test.id}</span>
+        <span class="test-title">${test.title}</span>
+      </div>
+      <div class="test-controls">
+        <select class="status-select" data-id="${test.id}">
+          <option value="untested">未テスト</option>
+          <option value="ok">✅ OK</option>
+          <option value="broken">❌ 崩れる</option>
+          <option value="partial">△ 部分的</option>
+        </select>
+        <button class="copy-btn" data-id="${test.id}">コピー</button>
+      </div>
+    </div>
+    <div class="test-card-body">
+      <div class="section-label">① 元のHTML（ここからコピー）</div>
+      <div class="payload" id="payload-${test.id}">${test.html}</div>
+
+      <div class="section-label">② Mediumからの貼り戻し（ここにペースト）</div>
+      <div class="paste-zone" contenteditable="true" data-id="${test.id}" data-placeholder="Mediumでコピーした結果をここにペースト (Cmd/Ctrl+V)"></div>
+      <div class="auto-result" id="autoresult-${test.id}"></div>
+      <details class="raw-toggle"><summary>取得した生HTMLを見る</summary><pre class="raw-html" id="rawhtml-${test.id}"></pre></details>
+
+      <input type="text" class="note-input" data-id="${test.id}" placeholder="備考（気づいた点など）">
+    </div>
+  `;
+  container.appendChild(card);
+});
+
+// --- copy handling (original -> clipboard) ---
+document.querySelectorAll('.copy-btn').forEach(btn => {
+  btn.addEventListener('click', async () => {
+    const id = btn.dataset.id;
+    const el = document.getElementById(`payload-${id}`);
+    const html = el.innerHTML;
+    const text = el.innerText;
+    let done = false;
+    try {
+      if (navigator.clipboard && window.ClipboardItem) {
+        const item = new ClipboardItem({
+          'text/html': new Blob([html], { type: 'text/html' }),
+          'text/plain': new Blob([text], { type: 'text/plain' })
+        });
+        await navigator.clipboard.write([item]);
+        done = true;
+      }
+    } catch (e) { done = false; }
+    if (!done) {
+      try {
+        const range = document.createRange();
+        range.selectNodeContents(el);
+        const sel = window.getSelection();
+        sel.removeAllRanges();
+        sel.addRange(range);
+        done = document.execCommand('copy');
+        sel.removeAllRanges();
+      } catch (e) { done = false; }
+    }
+    btn.textContent = done ? 'コピーしました' : 'コピー失敗（手動選択してください）';
+    btn.classList.toggle('copied', done);
+    setTimeout(() => { btn.textContent = 'コピー'; btn.classList.remove('copied'); }, 1500);
+  });
+});
+
+// --- paste-back handling (Medium result -> auto judge) ---
+document.querySelectorAll('.paste-zone').forEach(zone => {
+  zone.addEventListener('paste', (e) => {
+    e.preventDefault();
+    const id = zone.dataset.id;
+    const cd = e.clipboardData || window.clipboardData;
+    const html = cd.getData('text/html');
+    const text = cd.getData('text/plain');
+    const contentHtml = (html && html.trim()) ? html : `<p>${escapeHtml(text || '')}</p>`;
+
+    zone.innerHTML = contentHtml;
+    rawHtmlMap[id] = contentHtml;
+    document.getElementById(`rawhtml-${id}`).textContent = contentHtml;
+
+    let result;
+    try {
+      const stage = document.createElement('div');
+      stage.innerHTML = contentHtml;
+      const validator = VALIDATORS[id];
+      result = validator ? validator(stage) : partial('この項目には自動判定ロジックが未実装です。手動で判定してください');
+    } catch (err) {
+      result = partial(`判定処理中にエラーが発生しました（${err.message}）。内容は貼り付けられているので、手動でステータスを設定してください`);
+    }
+
+    detailMap[id] = result.detail;
+
+    const sel = document.querySelector(`.status-select[data-id="${id}"]`);
+    sel.value = result.status;
+    sel.dispatchEvent(new Event('change'));
+
+    const resultBox = document.getElementById(`autoresult-${id}`);
+    resultBox.innerHTML = '';
+    const badgeEl = document.createElement('span');
+    badgeEl.className = `badge ${result.status}`;
+    badgeEl.textContent = result.status === 'ok' ? 'OK' : result.status === 'broken' ? 'NG' : '部分的';
+    const textEl = document.createElement('div');
+    textEl.className = 'auto-result-text';
+    // result.detail は「<code>」のようにタグ名そのものへの言及を含みうるため、
+    // innerHTMLではなくtextContentで挿入し、本物のHTMLタグとして解釈されないようにする
+    textEl.textContent = result.detail;
+    resultBox.appendChild(badgeEl);
+    resultBox.appendChild(textEl);
+  });
+});
+
+// --- status handling ---
+function updateStats() {
+  const counts = { ok:0, broken:0, partial:0, untested:0 };
+  document.querySelectorAll('.status-select').forEach(sel => counts[sel.value]++);
+  const bar = document.getElementById('statBar');
+  bar.innerHTML = `
+    <span class="stat-pill"><span class="stat-dot ok"></span>OK: ${counts.ok}</span>
+    <span class="stat-pill"><span class="stat-dot broken"></span>崩れる: ${counts.broken}</span>
+    <span class="stat-pill"><span class="stat-dot partial"></span>部分的: ${counts.partial}</span>
+    <span class="stat-pill"><span class="stat-dot untested"></span>未テスト: ${counts.untested}</span>
+  `;
+}
+document.querySelectorAll('.status-select').forEach(sel => {
+  sel.addEventListener('change', () => {
+    const card = document.getElementById(`card-${sel.dataset.id}`);
+    card.classList.remove('status-ok', 'status-broken', 'status-partial');
+    sel.classList.remove('status-ok', 'status-broken', 'status-partial');
+    if (sel.value !== 'untested') {
+      card.classList.add(`status-${sel.value}`);
+      sel.classList.add(`status-${sel.value}`);
+    }
+    updateStats();
+  });
+});
+updateStats();
+
+// --- export ---
+document.getElementById('exportBtn').addEventListener('click', () => {
+  const statusLabel = { ok:'✅ OK', broken:'❌ 崩れる', partial:'△ 部分的', untested:'— 未テスト' };
+  let lines = [`# Medium貼り付け互換性チェック結果`, ``];
+  let currentCat = null;
+  TESTS.forEach(test => {
+    if (test.cat !== currentCat) { lines.push(`## ${test.cat}`, ``); currentCat = test.cat; }
+    const sel = document.querySelector(`.status-select[data-id="${test.id}"]`);
+    const note = document.querySelector(`.note-input[data-id="${test.id}"]`).value.trim();
+    lines.push(`- **[${test.id}] ${test.title}**: ${statusLabel[sel.value]}${note ? ` — ${note}` : ''}`);
+    const detail = detailMap[test.id];
+    if (detail) {
+      // 先頭の✅/△/❌はステータス表示と重複するので取り除く
+      const cleaned = detail.replace(/^(✅|△|❌)\s*/, '');
+      lines.push(`  - 判定根拠: ${cleaned}`);
+    }
+  });
+
+  // 生HTMLは末尾に別セクションとしてまとめる（箇条書きの中にコードブロックをネストさせると
+  // Markdownレンダラーによっては閉じ損ねて後続の行を巻き込んで消してしまうことがあるため分離）
+  const rawEntries = TESTS.filter(t => rawHtmlMap[t.id]);
+  if (rawEntries.length > 0) {
+    lines.push(``, `---`, ``, `## 参考: 貼り戻し時に取得した生HTML`, ``);
+    rawEntries.forEach(t => {
+      const raw = rawHtmlMap[t.id];
+      const snippet = raw.length > 200 ? raw.slice(0, 200) + '…' : raw;
+      lines.push(`### [${t.id}] ${t.title}`, ``, '```html', snippet, '```', ``);
+    });
+  }
+
+  document.getElementById('exportText').value = lines.join('\n');
+  document.getElementById('exportModal').style.display = 'flex';
+});
+document.getElementById('modalCloseBtn').addEventListener('click', () => {
+  document.getElementById('exportModal').style.display = 'none';
+});
+document.getElementById('modalCopyBtn').addEventListener('click', async () => {
+  const ta = document.getElementById('exportText');
+  ta.select();
+  try { await navigator.clipboard.writeText(ta.value); } catch (e) { document.execCommand('copy'); }
+});
+document.getElementById('resetBtn').addEventListener('click', () => {
+  if (!confirm('すべてのステータス・貼り戻し内容・備考をリセットしますか？')) return;
+  document.querySelectorAll('.status-select').forEach(sel => { sel.value = 'untested'; sel.dispatchEvent(new Event('change')); });
+  document.querySelectorAll('.note-input').forEach(inp => inp.value = '');
+  document.querySelectorAll('.paste-zone').forEach(z => z.innerHTML = '');
+  document.querySelectorAll('.auto-result').forEach(a => a.innerHTML = '');
+  document.querySelectorAll('.raw-html').forEach(p => p.textContent = '');
+  Object.keys(rawHtmlMap).forEach(k => delete rawHtmlMap[k]);
+  Object.keys(detailMap).forEach(k => delete detailMap[k]);
+});
+</script>
+
+</body>
+</html>
