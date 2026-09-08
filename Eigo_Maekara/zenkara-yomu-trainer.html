@@ -1,0 +1,1112 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>前から読むトレーナー ― スラッシュリーディングで返り読みグセを断つ</title>
+<meta name="description" content="英文をカタマリ(意味のかたまり)ごとに前から表示し、返り読みグセを直すための無料トレーニングツール。サーバー不要、データはブラウザ内のみ。">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Caveat:wght@600;700&family=Zen+Kaku+Gothic+New:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --board:#1F2E28;
+    --board-alt:#182420;
+    --chalk:#F1EEE4;
+    --chalk-dim:rgba(241,238,228,0.55);
+    --chalk-faint:rgba(241,238,228,0.16);
+    --yellow:#E7C767;
+    --blue:#8FB8D9;
+    --pink:#DD98A0;
+    --mint:#9FCDB0;
+    --rule: rgba(241,238,228,0.18);
+    --max-w: 700px;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    background:
+      radial-gradient(ellipse at 20% -10%, rgba(255,255,255,0.03), transparent 55%),
+      var(--board);
+    color:var(--chalk);
+    font-family:"Zen Kaku Gothic New", "Hiragino Sans", "Noto Sans JP", sans-serif;
+    line-height:1.75;
+    min-height:100vh;
+  }
+  .wrap{
+    max-width: var(--max-w);
+    margin: 0 auto;
+    padding: 40px 20px 80px;
+  }
+  header{ text-align:left; margin-bottom:32px; }
+  h1{
+    font-family:"Caveat", cursive;
+    font-weight:700;
+    font-size: 2.6rem;
+    line-height:1.1;
+    margin: 0 0 6px;
+    color: var(--chalk);
+    text-shadow: 0 0 14px rgba(241,238,228,0.12);
+    letter-spacing: 0.5px;
+  }
+  header .sub{
+    color: var(--chalk-dim);
+    font-size: 0.95rem;
+    margin: 0 0 14px;
+  }
+  header .blurb{
+    font-size:0.92rem;
+    color: var(--chalk-dim);
+    border-left: 2px dashed var(--rule);
+    padding-left: 12px;
+    margin: 0;
+  }
+  h2{
+    font-size: 1.0rem;
+    font-weight:700;
+    margin: 0 0 10px;
+    color: var(--yellow);
+    letter-spacing: 0.02em;
+  }
+  section{
+    margin-bottom: 30px;
+    padding-bottom: 26px;
+    border-bottom: 1px dashed var(--rule);
+  }
+  section:last-of-type{ border-bottom:none; }
+
+  label{ display:block; font-size:0.82rem; color:var(--chalk-dim); margin-bottom:6px; }
+
+  select, textarea, button, input[type=file]{
+    font-family: inherit;
+    font-size: 0.95rem;
+    color: var(--chalk);
+  }
+  select{
+    background: var(--board-alt);
+    border: 1px solid var(--rule);
+    border-radius: 6px;
+    padding: 8px 10px;
+    width: 100%;
+    margin-bottom: 12px;
+  }
+  textarea{
+    width:100%;
+    min-height: 92px;
+    background: var(--board-alt);
+    border: 1px solid var(--rule);
+    border-radius: 6px;
+    padding: 12px;
+    resize: vertical;
+  }
+  textarea:focus, select:focus, button:focus-visible{
+    outline: 2px solid var(--yellow);
+    outline-offset: 2px;
+  }
+  .row{ display:flex; gap:10px; flex-wrap:wrap; align-items:center; margin-top:12px; }
+
+  button{
+    background: transparent;
+    border: 1.5px solid var(--chalk);
+    color: var(--chalk);
+    padding: 9px 18px;
+    border-radius: 22px;
+    cursor: pointer;
+    transition: transform 0.12s ease, background 0.12s ease;
+  }
+  button:hover{ background: rgba(241,238,228,0.08); }
+  button:active{ transform: scale(0.97); }
+  button.primary{
+    border-color: var(--yellow);
+    color: var(--board);
+    background: var(--yellow);
+    font-weight:700;
+  }
+  button.primary:hover{ background:#eecf7d; }
+  button.ghost{
+    border-color: var(--rule);
+    color: var(--chalk-dim);
+    padding: 6px 12px;
+    font-size: 0.82rem;
+  }
+  button:disabled{ opacity:0.35; cursor:not-allowed; }
+
+  .tabs{ display:flex; gap:8px; flex-wrap:wrap; }
+  .tabs button{
+    border-radius: 8px 8px 0 0;
+    border: 1px solid var(--rule);
+    border-bottom:none;
+    background: var(--board-alt);
+    color: var(--chalk-dim);
+    padding: 8px 14px;
+    font-size:0.88rem;
+  }
+  .tabs button.active{
+    color: var(--board);
+    background: var(--chalk);
+    font-weight:700;
+  }
+
+  .workspace{
+    background: var(--board-alt);
+    border: 1px solid var(--rule);
+    border-radius: 0 8px 8px 8px;
+    padding: 22px;
+    min-height: 140px;
+  }
+  .hint{ color: var(--chalk-dim); font-size:0.85rem; margin: 0 0 14px; }
+
+  /* --- reveal mode --- */
+  .reveal-text{ font-size:1.15rem; }
+  .chunk{
+    display:inline;
+    padding: 2px 3px;
+    animation: writeon 0.28s ease;
+  }
+  @keyframes writeon{
+    from{ opacity:0; transform: scale(0.96); }
+    to{ opacity:1; transform: scale(1); }
+  }
+  .chunk.d0{ color: var(--chalk); }
+  .chunk.d1{ color: var(--blue); border-bottom: 2px dashed rgba(143,184,217,0.5); }
+  .chunk.d2{ color: var(--pink); border-bottom: 2px dashed rgba(221,152,160,0.5); }
+  .chunk.kind-coord{ color: var(--yellow); }
+  .chunk .tag{
+    display:inline-block;
+    font-size: 0.62rem;
+    vertical-align: super;
+    color: var(--chalk-dim);
+    margin-right:2px;
+  }
+  @media (prefers-reduced-motion: reduce){ .chunk{ animation:none; } }
+
+  .controls-row{ margin-top:20px; display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
+  .progress-dots{ font-size:0.8rem; color:var(--chalk-dim); }
+
+  /* --- structure map mode --- */
+  .map-line{
+    padding: 5px 0 5px calc(var(--depth, 0) * 20px);
+    border-left: 2px solid transparent;
+  }
+  .map-line.d0{ border-left-color: var(--mint); }
+  .map-line.d1{ border-left-color: var(--blue); }
+  .map-line.d2{ border-left-color: var(--pink); }
+  .map-line .lbl{
+    font-size:0.68rem;
+    color: var(--chalk-dim);
+    margin-right:8px;
+    border:1px solid var(--rule);
+    border-radius:4px;
+    padding:1px 5px;
+  }
+
+  /* --- manual mode --- */
+  .manual-text{ font-size:1.1rem; line-height:2.2; }
+  .gap{
+    display:inline-block;
+    width: 12px;
+    cursor:pointer;
+    position:relative;
+  }
+  .gap::after{
+    content:"";
+    position:absolute;
+    left:50%; top:-3px; bottom:-3px;
+    width:3px;
+    transform: translateX(-50%);
+    background: rgba(241,238,228,0.45);
+    border-radius:2px;
+  }
+  .gap.marked::after{ background: var(--yellow); width:4px; box-shadow: 0 0 8px rgba(231,199,103,0.75); }
+  .gap:hover::after{ background: rgba(231,199,103,0.85); }
+  .word{ white-space:nowrap; }
+  .score-box{
+    margin-top:16px;
+    padding:12px 14px;
+    border-radius:8px;
+    background: rgba(159,205,176,0.08);
+    border:1px solid rgba(159,205,176,0.3);
+    font-size:0.9rem;
+  }
+
+  .meaning-panel{ margin-bottom:14px; }
+  .meaning-panel .meaning-card{
+    background: var(--board-alt);
+    border: 1px solid var(--rule);
+    border-radius: 8px;
+    padding: 12px 16px;
+  }
+  .meaning-panel button{ width:100%; text-align:left; border:none; padding:2px 0; }
+  .meaning-panel button:hover{ background:transparent; color:var(--yellow); }
+  .meaning-panel .ja-box{
+    margin-top:10px;
+    padding-top:10px;
+    border-top: 1px dashed var(--rule);
+    font-size:0.92rem;
+    color: var(--chalk);
+  }
+  .hint-inline{
+    font-size:0.8rem;
+    color:var(--chalk-dim);
+    margin-left:10px;
+  }
+
+  .legend{ display:flex; gap:14px; flex-wrap:wrap; font-size:0.78rem; color:var(--chalk-dim); margin-top:16px; }
+  .legend span{ display:inline-flex; align-items:center; gap:5px; }
+  .swatch{ width:10px; height:10px; border-radius:50%; display:inline-block; }
+
+  .stats{ display:flex; gap:22px; flex-wrap:wrap; font-size:0.88rem; color: var(--chalk-dim); }
+  .stats b{ color: var(--chalk); font-size:1.1rem; display:block; }
+
+  footer{ color: var(--chalk-dim); font-size:0.78rem; margin-top:10px; }
+  footer a{ color: var(--yellow); }
+
+  .example-note{ font-size:0.8rem; color:var(--chalk-dim); margin: -4px 0 10px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <h1>前から読むトレーナー</h1>
+    <p class="sub">スラッシュリーディングで、英文の「返り読み」グセを断つ練習ツール</p>
+    <p class="blurb">until節やthat節が入れ子になった長い英文を、最後まで読んでから日本語の語順に組み立て直していませんか。このツールは英文をカタマリ（意味のまとまり）ごとに前から順番に表示し、返り読みせずに理解する練習をするためのものです。サーバー不要・完全にブラウザ内で完結し、通信は発生しません。</p>
+  </header>
+
+  <section id="input-section">
+    <h2>1. 英文を用意する</h2>
+    <label for="example-select">例文から選ぶ（任意）</label>
+    <select id="example-select">
+      <option value="">-- 例文を選択 --</option>
+    </select>
+    <div class="row" style="margin-top:-6px;">
+      <input type="number" id="example-number-input" min="1" max="50" placeholder="番号(1-50)"
+        style="width:110px; background:var(--board-alt); border:1px solid var(--rule); border-radius:6px; padding:8px 10px; color:var(--chalk);">
+      <button class="ghost" id="example-number-btn">番号で選ぶ</button>
+    </div>
+    <p class="example-note" id="example-note"></p>
+    <label for="text-input">練習したい英文（複数文も可）</label>
+    <textarea id="text-input" placeholder="ここに英文を貼り付けてください"></textarea>
+    <div class="row">
+      <button class="primary" id="build-btn">分解する</button>
+      <button class="ghost" id="clear-btn">クリア</button>
+    </div>
+  </section>
+
+  <section id="mode-section">
+    <h2>2. 練習する</h2>
+    <div class="tabs">
+      <button data-mode="reveal" class="active">前から読む</button>
+      <button data-mode="map">構造マップ</button>
+      <button data-mode="manual">自分で区切る</button>
+    </div>
+    <div class="meaning-panel" id="meaning-panel" style="display:none;"></div>
+    <div class="meaning-panel" id="memo-panel" style="display:none;"></div>
+    <div class="workspace" id="workspace">
+      <p class="hint">上で英文を入力し「分解する」を押すと、ここに練習画面が表示されます。</p>
+    </div>
+    <div class="legend">
+      <span><i class="swatch" style="background:var(--mint)"></i>主節（depth 0）</span>
+      <span><i class="swatch" style="background:var(--blue)"></i>従属節 depth 1</span>
+      <span><i class="swatch" style="background:var(--pink)"></i>従属節 depth 2+</span>
+      <span><i class="swatch" style="background:var(--yellow)"></i>接続詞</span>
+    </div>
+  </section>
+
+  <section id="progress-section">
+    <h2>記録</h2>
+    <div class="stats">
+      <div><b id="stat-total">0</b>練習した文</div>
+      <div><b id="stat-streak">0</b>日連続</div>
+    </div>
+    <div class="row">
+      <button class="ghost" id="export-btn">JSONで書き出す</button>
+      <label class="ghost" style="border:1px solid var(--rule); border-radius:22px; padding:6px 12px; cursor:pointer;">
+        読み込む <input type="file" id="import-input" accept="application/json" style="display:none;">
+      </label>
+    </div>
+  </section>
+
+  <footer>
+    このツールは正式な構文解析器ではなく、学習用の目安としてルールベースで英文を分解しています。分解結果が不自然な場合は「自分で区切る」モードで練習してみてください。データはすべてお使いのブラウザのlocalStorageにのみ保存され、外部には送信されません。MIT License.
+  </footer>
+
+</div>
+
+<script>
+(function(){
+  "use strict";
+
+  /* ---------------------------------------------------------
+     1. 例文データ
+  --------------------------------------------------------- */
+  var EXAMPLES = [
+    {
+      en: "The meeting was postponed until the manager returned from his business trip.",
+      note: "基本のuntil節。「〜まで」を前から捉える練習。",
+      ja: "会議は、マネージャーが出張から戻るまで延期された。"
+    },
+    {
+      en: "She didn't realize that the file she had sent contained a critical error until her colleague pointed it out during the presentation.",
+      note: "that節・関係詞節・until節が重なる中級文。",
+      ja: "彼女は、自分が送ったファイルに重大なミスが含まれていることに、同僚がプレゼン中に指摘するまで気づかなかった。"
+    },
+    {
+      en: "Although the experiment produced promising results, the researchers decided not to publish the paper until they had repeated the test several times.",
+      note: "although節とuntil節が両方入る文。",
+      ja: "その実験は有望な結果を出したものの、研究者たちはテストを何度か繰り返すまで論文を発表しないことに決めた。"
+    },
+    {
+      en: "The company announced that it would delay the product launch, which had already been postponed twice, until the safety issues were fully resolved.",
+      note: "that節の中にwhich節がさらに入れ子になる上級文。",
+      ja: "その会社は、すでに二度延期されていた製品の発売を、安全性の問題が完全に解決するまでさらに延期すると発表した。"
+    },
+    {
+      en: "Because the bridge was closed for repairs, drivers who commuted from the suburbs had to wait until a temporary route was opened.",
+      note: "because節・who節・until節が連なる文。",
+      ja: "橋が修理のため閉鎖されていたので、郊外から通勤するドライバーたちは、仮設ルートが開通するまで待たなければならなかった。"
+    },
+    {
+      en: "It wasn't until the final report was released that the public understood how serious the situation had become.",
+      note: "It wasn't until ... that 〜の強調構文。日本人学習者が特に混乱しやすい形。",
+      ja: "最終報告書が公表されて初めて、事態がどれほど深刻になっていたかを世間は理解した。"
+    },
+    {
+      en: "He kept working on the design even though he knew that the deadline had already passed.",
+      note: "even though節とthat節が連続する文。",
+      ja: "締め切りがすでに過ぎていると分かっていたにもかかわらず、彼はデザインの作業を続けた。"
+    },
+    {
+      en: "The teacher explained that students would not receive their grades until the committee, which met only twice a year, had reviewed every case.",
+      note: "that節・until節・which節が三重に入れ子になる長文。",
+      ja: "教師は、年に二回しか開かれない委員会がすべてのケースを審査し終えるまで、学生たちは成績を受け取れないと説明した。"
+    },
+    {
+      en: "Before you sign the contract, make sure that you understand every clause.",
+      note: "before節とthat節が両方入る基本文。",
+      ja: "契約書に署名する前に、すべての条項を理解していることを確認してください。"
+    },
+    {
+      en: "While the manager was reviewing the report, one of the interns discovered a mistake that no one had noticed before.",
+      note: "while節と関係詞that節が重なる文。",
+      ja: "マネージャーが報告書を確認している間に、インターンの一人が、それまで誰も気づいていなかったミスを発見した。"
+    },
+    {
+      en: "Since the new policy was introduced, employees who work remotely have had to submit weekly reports.",
+      note: "since(理由)節と関係詞who節。",
+      ja: "新しい方針が導入されて以来、リモートで働く従業員は毎週報告書を提出しなければならなくなった。"
+    },
+    {
+      en: "If the weather improves tomorrow, we will hold the event outdoors instead of moving it inside.",
+      note: "基本のif節。",
+      ja: "もし明日天気が良くなれば、屋内に移すのではなく屋外でイベントを開催します。"
+    },
+    {
+      en: "Unless the committee approves the budget by Friday, the project that has been planned for months will have to be cancelled.",
+      note: "unless節とthat節。",
+      ja: "委員会が金曜日までに予算を承認しない限り、何ヶ月も計画されてきたそのプロジェクトは中止せざるを得ない。"
+    },
+    {
+      en: "Once the training program is completed, new employees are expected to demonstrate what they have learned.",
+      note: "once節。「〜したら」の感覚をつかむ。",
+      ja: "研修プログラムが終わると、新入社員はそれまでに学んだことを示すことが求められる。"
+    },
+    {
+      en: "Though he had studied the subject for years, he still found the professor's questions difficult to answer.",
+      note: "though(譲歩)節。",
+      ja: "その分野を何年も研究してきたにもかかわらず、彼は教授の質問に答えるのが難しいと感じた。"
+    },
+    {
+      en: "The town where I grew up has changed so much that I barely recognized it when I visited last year.",
+      note: "where節・so...that構文・when節が重なる文。",
+      ja: "私が育った町はとても変わってしまったので、去年訪れたときほとんど分からなかった。"
+    },
+    {
+      en: "The negotiations, which had continued for nearly a year, finally ended when both sides agreed to a compromise that satisfied no one completely.",
+      note: "which節・when節・that節が三重に重なる上級文。",
+      ja: "一年近く続いた交渉は、双方が誰も完全には満足しない妥協案に合意したときに、ついに終わった。"
+    },
+    {
+      en: "So that the new system would not disrupt daily operations, the IT team scheduled the update for a time when most employees had already left the office.",
+      note: "目的を表すso that節と、時を表すwhen節。",
+      ja: "新しいシステムが日常業務を妨げないように、IT部門は、ほとんどの従業員がすでに退社している時間帯に更新を予定した。"
+    },
+    {
+      en: "Provided that the results are consistent, the team plans to submit the paper to the journal that rejected their previous work.",
+      note: "provided that(条件)節と関係詞that節。",
+      ja: "結果に一貫性があれば、チームは以前の論文を却下したその学術誌に、論文を提出する予定だ。"
+    },
+    {
+      en: "Now that the children have grown up and moved out, the house where they used to play feels strangely quiet.",
+      note: "now that(理由)節とwhere節。",
+      ja: "子どもたちが大人になって家を出た今、彼らがかつて遊んでいた家は不思議なほど静かに感じられる。"
+    },
+    {
+      en: "As soon as the alarm went off, everyone who was still inside the building rushed toward the nearest exit.",
+      note: "as soon as節とwho節。",
+      ja: "警報が鳴るとすぐに、まだ建物の中にいた全員が最寄りの出口へ急いだ。"
+    },
+    {
+      en: "As long as the data remains encrypted, users can trust that their personal information will not be exposed even if the server is compromised.",
+      note: "as long as・that・even ifが重なる文。",
+      ja: "データが暗号化されている限り、たとえサーバーが攻撃されても、個人情報が漏れないとユーザーは信頼できる。"
+    },
+    {
+      en: "Even if the results are disappointing, it is important to report them honestly so that future researchers do not repeat the same mistake.",
+      note: "even if節とso that節。",
+      ja: "たとえ結果が期待外れであっても、将来の研究者が同じ失敗を繰り返さないように、正直に報告することが重要だ。"
+    },
+    {
+      en: "He answered the question as if he had known the material for years, although he had actually studied it the night before.",
+      note: "as if節とalthough節。",
+      ja: "彼はまるで何年もその内容を知っていたかのように質問に答えたが、実際には前の晩に勉強しただけだった。"
+    },
+    {
+      en: "As though nothing had happened, she walked into the meeting that everyone else had been dreading all week.",
+      note: "as though節と関係詞that節。",
+      ja: "まるで何事もなかったかのように、彼女は皆が一週間ずっと恐れていたその会議に入っていった。"
+    },
+    {
+      en: "Not only did the company fail to meet its sales targets, but it also lost several key clients who had been loyal for over a decade.",
+      note: "not only...but alsoと関係詞whoが組み合わさる文。",
+      ja: "その会社は売上目標を達成できなかっただけでなく、十年以上忠実だった主要顧客を何人も失った。"
+    },
+    {
+      en: "The more carefully you read the contract, the more clauses you will find that seem designed to protect only one side.",
+      note: "the more...the more構文と関係詞that。",
+      ja: "契約書を注意深く読めば読むほど、一方だけを守るように作られているように見える条項が見つかるだろう。"
+    },
+    {
+      en: "By the time the ambulance arrived, the patient, who had been unconscious for several minutes, had already started to regain consciousness.",
+      note: "by the time節と関係詞who節。",
+      ja: "救急車が到着するまでに、数分間意識を失っていたその患者は、すでに意識を取り戻し始めていた。"
+    },
+    {
+      en: "What surprised the investigators most was not that the fire had started so quickly, but that no one had noticed it until it was too late.",
+      note: "What〜is that構文とnot A but B構文が組み合わさる高度な文。",
+      ja: "捜査官たちが最も驚いたのは、火が急速に広がったことではなく、手遅れになるまで誰もそれに気づかなかったことだった。"
+    },
+    {
+      en: "The report, which took the committee nearly six months to compile, concluded that the accident could have been prevented if proper safety checks had been carried out.",
+      note: "which・that・ifが三重に重なる文。",
+      ja: "委員会が完成までにほぼ半年かけたその報告書は、適切な安全点検が行われていれば事故は防げていたと結論づけた。"
+    },
+    {
+      en: "It is often said that people who grow up bilingual find it easier to learn a third language than those who speak only one language from childhood.",
+      note: "It is said that構文と二つのwho節。",
+      ja: "バイリンガルとして育った人は、子どもの頃から一つの言語しか話さない人よりも、三つ目の言語を習得しやすいとよく言われる。"
+    },
+    {
+      en: "Whether or not the merger goes through, employees who have worked at the company for more than five years will receive the bonus that was promised last year.",
+      note: "whether or not節、who節、that節が組み合わさる文。",
+      ja: "合併が実現するかどうかにかかわらず、五年以上その会社で働いてきた従業員は、昨年約束されたボーナスを受け取ることになる。"
+    },
+    {
+      en: "Given that the budget has already been approved, there is no reason why the project, which was delayed twice last year, should be postponed again.",
+      note: "given that節・why節・which節が重なる文。",
+      ja: "予算がすでに承認されている以上、昨年二度延期されたそのプロジェクトを再び先送りする理由はない。"
+    },
+    {
+      en: "The negotiations broke down because neither side was willing to make the concessions that the other considered essential.",
+      note: "because節とthat節。",
+      ja: "どちらの側も、相手が不可欠だと考える譲歩をする気がなかったため、交渉は決裂した。"
+    },
+    {
+      en: "Whoever wins the election will inherit a set of economic problems that have been building for years and that will not be easy to solve quickly.",
+      note: "whoever節と二つのthat節が並ぶ文。",
+      ja: "選挙で誰が勝っても、何年もかけて積み重なってきた経済問題を引き継ぐことになり、それらはすぐには解決しにくいだろう。"
+    },
+    {
+      en: "The scandal, which had been rumored for months before it was finally confirmed, forced the CEO to resign earlier than anyone had expected.",
+      note: "which節・before節・thanの比較節。",
+      ja: "何ヶ月も前から噂されていたそのスキャンダルは、ついに確認されると、誰もが予想していたよりも早くCEOを辞任させることになった。"
+    },
+    {
+      en: "Researchers found that although the drug reduced symptoms in most patients, it also caused side effects that were serious enough to halt the trial.",
+      note: "that節・although節・that(関係詞)節が重なる文。",
+      ja: "研究者たちは、その薬がほとんどの患者の症状を軽減した一方で、試験を中止せざるを得ないほど深刻な副作用も引き起こしたことを発見した。"
+    },
+    {
+      en: "No sooner had the plane landed than passengers who had been waiting anxiously began calling their families to say that they were safe.",
+      note: "No sooner...than倒置構文とwho節・that節。",
+      ja: "飛行機が着陸するとすぐに、不安げに待っていた乗客たちは、無事であることを伝えようと家族に電話をかけ始めた。"
+    },
+    {
+      en: "It remains unclear whether the delay was caused by a technical failure or by human error that could have been avoided with better training.",
+      note: "whether...or構文とthat節。",
+      ja: "その遅延が技術的な故障によるものだったのか、それとも適切な訓練があれば避けられたはずのヒューマンエラーによるものだったのかは、いまだに明らかになっていない。"
+    },
+    {
+      en: "The more data the algorithm processes, the more accurate its predictions become, although the improvement eventually levels off once a certain threshold is reached.",
+      note: "the more...the more構文・although節・once節。",
+      ja: "アルゴリズムが処理するデータが増えるほど予測はより正確になるが、ある閾値に達すると、その改善はやがて頭打ちになる。"
+    },
+    {
+      en: "The witness testified that she had seen the defendant leave the building at exactly the time when the crime was believed to have occurred.",
+      note: "that節とwhen節。",
+      ja: "証人は、その犯罪が起きたと考えられているまさにその時刻に、被告人が建物を出るのを見たと証言した。"
+    },
+    {
+      en: "Despite the fact that the company had issued repeated warnings, many employees continued to use passwords that were easy to guess.",
+      note: "despite the fact that節とthat(関係詞)節。",
+      ja: "会社が繰り返し警告を発していたにもかかわらず、多くの従業員は推測しやすいパスワードを使い続けた。"
+    },
+    {
+      en: "The island, which can only be reached by boat, remains largely untouched by the tourism that has transformed much of the coastline nearby.",
+      note: "which節とthat(関係詞)節。",
+      ja: "船でしか行けないその島は、近隣の海岸線の多くを変えてしまった観光の影響をほとんど受けていない。"
+    },
+    {
+      en: "So many people applied for the position that the company had to extend the deadline it had originally set for reviewing applications.",
+      note: "so...that構文。",
+      ja: "あまりにも多くの人がその職に応募したため、会社は当初設定していた応募書類の審査期限を延長せざるを得なかった。"
+    },
+    {
+      en: "Although economists had warned for years that the housing market was overvalued, few people expected the crash to happen as suddenly as it did.",
+      note: "although節・that節・as...as比較構文。",
+      ja: "経済学者たちは住宅市場が過大評価されていると何年も警告していたが、暴落が実際に起きたほど急激に起こるとは、ほとんど誰も予想していなかった。"
+    },
+    {
+      en: "The article claims that remote work, which became common during the pandemic, has permanently changed how many companies think about office space.",
+      note: "that節・which節・howの間接疑問節。",
+      ja: "その記事は、パンデミック中に一般的になったリモートワークが、多くの企業のオフィススペースに対する考え方を恒久的に変えたと主張している。"
+    },
+    {
+      en: "Until the results of the audit are made public, shareholders who have invested heavily in the company can do little but wait.",
+      note: "until節とwho節。",
+      ja: "監査結果が公表されるまで、その会社に多額の投資をしてきた株主たちは、待つ以外にほとんどできることがない。"
+    },
+    {
+      en: "The professor explained that the theory, although widely accepted for decades, had never actually been tested under the conditions that the new experiment created.",
+      note: "that・although・thatが三重に重なる文。",
+      ja: "その教授は、その理論は何十年も広く受け入れられてきたものの、新しい実験が作り出した条件下では一度も検証されたことがなかったと説明した。"
+    },
+    {
+      en: "Whatever the outcome of the trial, the case has already raised questions that lawmakers say need to be addressed before similar disputes arise again.",
+      note: "whatever節・that節・beforeが重なる高度な文。",
+      ja: "裁判の結果がどうであれ、その事件はすでに、同様の紛争が再び起きる前に対処する必要があると議員たちが言う問題を提起している。"
+    },
+    {
+      en: "It was only after the second inspection that officials realized the damage was far more extensive than the initial report, which had been prepared hastily, had suggested.",
+      note: "It was only after...that強調構文、比較構文、which節が重なる最上級の文。",
+      ja: "二度目の点検が行われて初めて、当局は被害が、急いで作成されたその最初の報告書が示していたよりもはるかに深刻であることに気づいた。"
+    }
+  ];
+
+  /* ---------------------------------------------------------
+     2. ルールベース・チャンク分解エンジン
+  --------------------------------------------------------- */
+  var MULTI_WORD_SUBS = [
+    {words:["in","order","that"], label:"目的"},
+    {words:["as","long","as"], label:"条件・期間"},
+    {words:["as","soon","as"], label:"時"},
+    {words:["even","though"], label:"譲歩"},
+    {words:["even","if"], label:"譲歩・条件"},
+    {words:["so","that"], label:"目的"},
+    {words:["provided","that"], label:"条件"},
+    {words:["now","that"], label:"理由"},
+    {words:["as","though"], label:"様態"},
+    {words:["as","if"], label:"様態"}
+  ].sort(function(a,b){ return b.words.length - a.words.length; });
+
+  var SINGLE_WORD_SUBS = {
+    "that":"that節", "which":"関係詞節", "who":"関係詞節", "whom":"関係詞節",
+    "whose":"関係詞節", "where":"関係詞節(場所)", "when":"時", "while":"時(同時)",
+    "before":"時", "after":"時", "until":"時(〜まで)", "since":"時・理由",
+    "once":"時(〜したら)", "because":"理由", "although":"譲歩", "though":"譲歩",
+    "if":"条件", "unless":"条件(〜でなければ)",
+    "whatever":"譲歩(〜であろうと)", "whoever":"譲歩(誰であれ)",
+    "whichever":"譲歩(どちらであれ)", "whenever":"時(〜するときはいつも)",
+    "wherever":"場所(どこで〜しても)"
+  };
+
+  var AMBIGUOUS = {"before":1, "after":1, "since":1};
+
+  var VERB_STARTERS = {};
+  ["is","was","were","are","am","be","been","being","has","have","had","did","does","do",
+   "will","would","can","could","should","must","might","may","went","go","goes","going",
+   "came","come","comes","said","says","saying","arrived","arrives","started","starts",
+   "began","begins","finished","finishes","left","leaves","returned","returns","happened",
+   "happens","changed","changes","announced","announces","decided","decides","realized",
+   "realizes","knew","know","knows","became","becomes","gave","gives","took","takes",
+   "made","makes","got","gets","told","tells","called","calls","moved","moves","opened",
+   "opens","closed","closes","released","releases","confirmed","confirms","increased",
+   "increases","decreased","decreases","continued","continues","rose","rises","fell",
+   "falls","grew","grows","arise","arises","occur","occurs","exist","exists","remain",
+   "remains","emerge","emerges","follow","follows","lead","leads","seem","seems",
+   "appear","appears","result","results"].forEach(function(w){ VERB_STARTERS[w]=1; });
+
+  var PRONOUNS_DET = {};
+  ["the","a","an","this","that","these","those","his","her","their","its","my","your",
+   "our","i","he","she","it","they","we","you","there"].forEach(function(w){ PRONOUNS_DET[w]=1; });
+
+  var PREPOSITIONS = {};
+  ["in","on","at","by","with","without","from","for","of","to","into","onto","upon",
+   "within","during","throughout","despite","among","between","through","under","over",
+   "about","against","toward","towards","across","near","along","behind","beyond",
+   "besides","except","regarding","concerning"].forEach(function(w){ PREPOSITIONS[w]=1; });
+
+  var COORDINATORS = {"and":1,"but":1,"or":1,"so":1,"yet":1};
+  var COORD_PRONOUNS = {"i":1,"you":1,"he":1,"she":1,"it":1,"we":1,"they":1,"this":1,"that":1,"these":1,"those":1,"there":1};
+
+  function clean(tok){ return (tok||"").toLowerCase().replace(/[^a-z']/g,""); }
+
+  function looksLikeClause(words, i){
+    /* before/after/since の曖昧さを解消するため、直後の数語を先まで見て
+       動詞らしき語(または動詞語尾)が現れるかを調べる。句読点に当たったら
+       そこで打ち切る(＝動詞が見つからなければ前置詞句とみなす)。 */
+    var limit = Math.min(i + 4, words.length - 1);
+    for (var j = i + 1; j <= limit; j++){
+      var raw = words[j] || "";
+      var w = clean(raw);
+      if (VERB_STARTERS[w]) return true;
+      if (/^[a-z]+(ed|ing)$/.test(w) && w.length > 4) return true;
+      if (/[,;:.!?]$/.test(raw)) break;
+    }
+    return false;
+  }
+
+  var PREP_OBJECT_STARTERS = {};
+  ["the","a","an","this","that","these","those","his","her","their","its","my","your",
+   "our","one","two","three","some","any","each","every","no","much","many"].forEach(function(w){ PREP_OBJECT_STARTERS[w]=1; });
+
+  function looksLikePrepositionObject(raw){
+    var w = clean(raw);
+    if (PREP_OBJECT_STARTERS[w]) return true;
+    if (/^[A-Z]/.test(raw || "")) return true; /* 固有名詞らしき大文字始まり */
+    return false;
+  }
+
+  function coordLooksLikeClauseStart(words, i){
+    var raw = words[i+1] || "";
+    var next = clean(raw);
+    if (COORD_PRONOUNS[next]) return true;
+    if (/^[A-Z]/.test(raw)) return true;
+    return false;
+  }
+
+  function buildChunks(text){
+    var words = text.trim().split(/\s+/).filter(Boolean);
+    var chunks = [];
+    var current = null;
+    var depth = 0;
+
+    function startChunk(d, label, kind){
+      if (current && current.words.length > 0) chunks.push(current);
+      current = { words: [], depth: d, label: label || null, kind: kind || "main" };
+    }
+    startChunk(0, null, "main");
+
+    var i = 0;
+    while (i < words.length){
+      var raw = words[i];
+      var cw = clean(raw);
+      var matchedMulti = null;
+
+      for (var m = 0; m < MULTI_WORD_SUBS.length; m++){
+        var mw = MULTI_WORD_SUBS[m].words;
+        var ok = true;
+        for (var k = 0; k < mw.length; k++){
+          if (clean(words[i+k]) !== mw[k]) { ok = false; break; }
+        }
+        if (ok){ matchedMulti = MULTI_WORD_SUBS[m]; break; }
+      }
+
+      if (matchedMulti){
+        depth += 1;
+        startChunk(depth, matchedMulti.label, "sub");
+        for (var k2 = 0; k2 < matchedMulti.words.length; k2++){
+          current.words.push(words[i+k2]);
+        }
+        i += matchedMulti.words.length;
+      } else if (SINGLE_WORD_SUBS[cw] && !(AMBIGUOUS[cw] && !looksLikeClause(words, i))){
+        depth += 1;
+        startChunk(depth, SINGLE_WORD_SUBS[cw], "sub");
+        current.words.push(raw);
+        i += 1;
+      } else if (PREPOSITIONS[cw] && current.words.length >= 4 && (cw !== "to" || looksLikePrepositionObject(words[i+1]))){
+        startChunk(depth, "前置詞句", "prep");
+        current.words.push(raw);
+        i += 1;
+      } else if (COORDINATORS[cw] && current.words.length >= 4 && coordLooksLikeClauseStart(words, i)){
+        depth = 0;
+        startChunk(0, "接続", "coord");
+        current.words.push(raw);
+        i += 1;
+      } else if (current.words.length >= 9 && PREPOSITIONS[cw] && (cw !== "to" || looksLikePrepositionObject(words[i+1]))){
+        startChunk(depth, "前置詞句", "prep");
+        current.words.push(raw);
+        i += 1;
+      } else {
+        current.words.push(raw);
+        i += 1;
+      }
+
+      var lastRaw = current.words[current.words.length - 1];
+      if (/[,;:]$/.test(lastRaw)){
+        if (depth > 0) depth -= 1;
+        startChunk(depth, null, "main");
+      } else if (/[.!?]$/.test(lastRaw)){
+        depth = 0;
+        startChunk(0, null, "main");
+      }
+    }
+    if (current && current.words.length > 0) chunks.push(current);
+    return chunks;
+  }
+
+  function depthClass(d){ return d <= 0 ? "d0" : (d === 1 ? "d1" : "d2"); }
+
+  /* ---------------------------------------------------------
+     3. 状態管理 / localStorage
+  --------------------------------------------------------- */
+  var STORE_KEY = "zenkarayomi_v1";
+  function defaultStore(){ return { totalCompleted: 0, lastDate: null, streak: 0, customSentences: [], notes: {} }; }
+  function loadStore(){
+    try{
+      var raw = localStorage.getItem(STORE_KEY);
+      if (!raw) return defaultStore();
+      var parsed = JSON.parse(raw);
+      if (!parsed.notes) parsed.notes = {};
+      if (!parsed.customSentences) parsed.customSentences = [];
+      return parsed;
+    }catch(e){ return defaultStore(); }
+  }
+  function saveStore(s){
+    try{ localStorage.setItem(STORE_KEY, JSON.stringify(s)); }catch(e){}
+  }
+  var store = loadStore();
+
+  function hashStr(s){
+    var h = 0;
+    for (var i = 0; i < s.length; i++){ h = (h * 31 + s.charCodeAt(i)) | 0; }
+    return h;
+  }
+  function escapeHtml(s){
+    return (s || "").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+  }
+
+  function todayStr(){ return new Date().toISOString().slice(0,10); }
+
+  function markCompleted(){
+    var today = todayStr();
+    if (store.lastDate === today){
+      /* already counted a completion today: just bump total */
+    } else {
+      var y = new Date(); y.setDate(y.getDate()-1);
+      var yesterday = y.toISOString().slice(0,10);
+      store.streak = (store.lastDate === yesterday) ? (store.streak + 1) : 1;
+      store.lastDate = today;
+    }
+    store.totalCompleted += 1;
+    saveStore(store);
+    renderStats();
+  }
+
+  function renderStats(){
+    document.getElementById("stat-total").textContent = store.totalCompleted;
+    document.getElementById("stat-streak").textContent = store.streak;
+  }
+
+  /* ---------------------------------------------------------
+     4. UI 配線
+  --------------------------------------------------------- */
+  function pad2(n){ return n < 10 ? "0" + n : String(n); }
+
+  var exampleSelect = document.getElementById("example-select");
+  var exampleNote = document.getElementById("example-note");
+  var numberInput = document.getElementById("example-number-input");
+  numberInput.max = String(EXAMPLES.length);
+  EXAMPLES.forEach(function(ex, idx){
+    var opt = document.createElement("option");
+    opt.value = idx;
+    opt.textContent = pad2(idx + 1) + ". " + ex.en.slice(0, 42) + (ex.en.length > 42 ? "…" : "");
+    exampleSelect.appendChild(opt);
+  });
+  var currentTranslation = null;
+  var currentKey = null;
+
+  function findExampleIndex(text){
+    var t = text.trim();
+    for (var i = 0; i < EXAMPLES.length; i++){
+      if (EXAMPLES[i].en.trim() === t) return i;
+    }
+    return -1;
+  }
+
+  function selectExampleByIndex(idx){
+    if (idx < 0 || idx >= EXAMPLES.length) return;
+    var ex = EXAMPLES[idx];
+    exampleSelect.value = idx;
+    numberInput.value = idx + 1;
+    document.getElementById("text-input").value = ex.en;
+    exampleNote.textContent = "💡 " + pad2(idx + 1) + "番: " + ex.note;
+  }
+
+  exampleSelect.addEventListener("change", function(){
+    if (exampleSelect.value === ""){ exampleNote.textContent = ""; return; }
+    selectExampleByIndex(+exampleSelect.value);
+  });
+
+  document.getElementById("example-number-btn").addEventListener("click", function(){
+    var n = parseInt(numberInput.value, 10);
+    if (!n || n < 1 || n > EXAMPLES.length){
+      alert("1〜" + EXAMPLES.length + "の番号を入力してください");
+      return;
+    }
+    selectExampleByIndex(n - 1);
+  });
+  numberInput.addEventListener("keydown", function(e){
+    if (e.key === "Enter"){ document.getElementById("example-number-btn").click(); }
+  });
+
+  document.getElementById("clear-btn").addEventListener("click", function(){
+    document.getElementById("text-input").value = "";
+    exampleNote.textContent = "";
+    exampleSelect.value = "";
+    numberInput.value = "";
+  });
+
+  var currentMode = "reveal";
+  var currentChunks = [];
+  var currentSentenceRaw = "";
+
+  var tabButtons = document.querySelectorAll(".tabs button");
+  tabButtons.forEach(function(btn){
+    btn.addEventListener("click", function(){
+      tabButtons.forEach(function(b){ b.classList.remove("active"); });
+      btn.classList.add("active");
+      currentMode = btn.getAttribute("data-mode");
+      render();
+    });
+  });
+
+  document.getElementById("build-btn").addEventListener("click", function(){
+    var text = document.getElementById("text-input").value.trim();
+    if (!text){ return; }
+    currentSentenceRaw = text;
+    currentChunks = buildChunks(text);
+    var idx = findExampleIndex(text);
+    currentTranslation = idx >= 0 ? EXAMPLES[idx].ja : null;
+    currentKey = idx >= 0 ? ("ex:" + idx) : ("custom:" + hashStr(text));
+    render();
+    renderMeaningPanel();
+    renderMemoPanel();
+  });
+
+  function renderMeaningPanel(){
+    var panel = document.getElementById("meaning-panel");
+    panel.style.display = "block";
+    var innerHtml;
+    if (currentTranslation){
+      innerHtml =
+        '<button id="meaning-toggle-btn">▸ 文全体の意味を確認する</button>' +
+        '<div class="ja-box" id="ja-box" style="display:none;">' + currentTranslation + '</div>';
+    } else {
+      innerHtml =
+        '<button id="meaning-toggle-btn">▸ 文全体の意味を確認する</button>' +
+        '<div class="ja-box" id="ja-box" style="display:none;">この文には日本語訳が登録されていません（例文選択の場合のみ日本語訳が表示されます）。ご自身で入力した文は、オンライン翻訳などで意味を確認してください。</div>';
+    }
+    panel.innerHTML = '<div class="meaning-card">' + innerHtml + '</div>';
+    var btn = document.getElementById("meaning-toggle-btn");
+    btn.addEventListener("click", function(){
+      var box = document.getElementById("ja-box");
+      var open = box.style.display !== "none";
+      box.style.display = open ? "none" : "block";
+      btn.textContent = (open ? "▸" : "▾") + " 文全体の意味を確認する";
+    });
+  }
+
+  function renderMemoPanel(){
+    var panel = document.getElementById("memo-panel");
+    panel.style.display = "block";
+    var existing = (store.notes && store.notes[currentKey]) || "";
+    panel.innerHTML =
+      '<div class="meaning-card">' +
+        '<label style="margin-bottom:6px;">この英文についてのメモ（気づいたこと・分からなかった単語・感想など）</label>' +
+        '<textarea id="memo-textarea" style="min-height:70px; width:100%;">' + escapeHtml(existing) + '</textarea>' +
+        '<div class="row" style="margin-top:8px;">' +
+          '<button class="ghost" id="memo-save-btn">メモを保存</button>' +
+          '<span class="hint-inline" id="memo-status"></span>' +
+        '</div>' +
+      '</div>';
+    document.getElementById("memo-save-btn").addEventListener("click", function(){
+      var val = document.getElementById("memo-textarea").value;
+      if (!store.notes) store.notes = {};
+      store.notes[currentKey] = val;
+      saveStore(store);
+      var status = document.getElementById("memo-status");
+      status.textContent = "保存しました ✓";
+      setTimeout(function(){ if (status) status.textContent = ""; }, 1500);
+    });
+  }
+
+  function render(){
+    if (!currentChunks.length){
+      document.getElementById("workspace").innerHTML =
+        '<p class="hint">上で英文を入力し「分解する」を押すと、ここに練習画面が表示されます。</p>';
+      return;
+    }
+    if (currentMode === "reveal") renderReveal();
+    else if (currentMode === "map") renderMap();
+    else renderManual();
+  }
+
+  /* ---- reveal mode ---- */
+  var revealIndex = 0;
+  function renderReveal(){
+    revealIndex = 0;
+    var ws = document.getElementById("workspace");
+    ws.innerHTML =
+      '<p class="hint">クリック、またはスペースキーで次のカタマリを表示します。表示された部分だけで、一度立ち止まって意味を掴んでから進みましょう。</p>' +
+      '<div class="reveal-text" id="reveal-text" tabindex="0"></div>' +
+      '<div class="controls-row">' +
+        '<button class="primary" id="next-chunk-btn">次のカタマリ →</button>' +
+        '<button class="ghost" id="restart-reveal-btn">最初からやり直す</button>' +
+        '<span class="progress-dots" id="reveal-progress"></span>' +
+      '</div>';
+    var textEl = document.getElementById("reveal-text");
+    var nextBtn = document.getElementById("next-chunk-btn");
+    textEl.focus();
+
+    function showNext(){
+      if (revealIndex >= currentChunks.length){ return; }
+      var c = currentChunks[revealIndex];
+      var span = document.createElement("span");
+      span.className = "chunk " + depthClass(c.depth) + (c.kind === "coord" ? " kind-coord" : "");
+      var tagHtml = c.label ? '<span class="tag">[' + c.label + ']</span>' : "";
+      span.innerHTML = tagHtml + c.words.join(" ") + " ";
+      textEl.appendChild(span);
+      revealIndex += 1;
+      document.getElementById("reveal-progress").textContent = revealIndex + " / " + currentChunks.length;
+      if (revealIndex >= currentChunks.length){
+        nextBtn.disabled = true;
+        markCompleted();
+        var reviewNote = document.createElement("p");
+        reviewNote.className = "hint";
+        reviewNote.style.marginTop = "16px";
+        reviewNote.textContent = "読み終えました。「構造マップ」タブで、この文の構造を振り返ってみましょう。";
+        ws.appendChild(reviewNote);
+      }
+    }
+    nextBtn.addEventListener("click", showNext);
+    document.getElementById("restart-reveal-btn").addEventListener("click", renderReveal);
+    document.getElementById("reveal-progress").textContent = "0 / " + currentChunks.length;
+
+    textEl.addEventListener("keydown", function(e){
+      if (e.code === "Space"){ e.preventDefault(); showNext(); }
+    });
+    textEl.addEventListener("click", showNext);
+  }
+
+  /* ---- structure map mode ---- */
+  function renderMap(){
+    var ws = document.getElementById("workspace");
+    var html = '<p class="hint">文の構造をまとめて確認できます。インデントと色が節の深さを表します。</p>';
+    currentChunks.forEach(function(c){
+      var lbl = c.label ? '<span class="lbl">' + c.label + '</span>' : "";
+      html += '<div class="map-line ' + depthClass(c.depth) + '" style="--depth:' + c.depth + '">' +
+                lbl + c.words.join(" ") +
+              '</div>';
+    });
+    ws.innerHTML = html;
+  }
+
+  /* ---- manual chunking mode ---- */
+  var manualBoundaries = null;
+  function renderManual(){
+    manualBoundaries = new Set();
+    var words = currentSentenceRaw.trim().split(/\s+/).filter(Boolean);
+    var ws = document.getElementById("workspace");
+    ws.innerHTML =
+      '<p class="hint">単語と単語の間の縦線（薄いグレーの線）をクリックすると、そこに切れ目（黄色）を入れられます。もう一度クリックすると消せます。終わったら答え合わせできます。</p>' +
+      '<div class="manual-text" id="manual-text"></div>' +
+      '<div class="controls-row">' +
+        '<button class="primary" id="check-btn">答え合わせ</button>' +
+        '<button class="ghost" id="reset-manual-btn">リセット</button>' +
+        '<button class="ghost" id="hint-count-btn">ヒント: 何か所に分ける？</button>' +
+        '<span class="hint-inline" id="hint-count-text"></span>' +
+      '</div>' +
+      '<div id="score-area"></div>';
+    var container = document.getElementById("manual-text");
+    words.forEach(function(w, idx){
+      var wordSpan = document.createElement("span");
+      wordSpan.className = "word";
+      wordSpan.textContent = w;
+      container.appendChild(wordSpan);
+      if (idx < words.length - 1){
+        var gap = document.createElement("span");
+        gap.className = "gap";
+        gap.dataset.idx = idx;
+        gap.addEventListener("click", function(){
+          if (manualBoundaries.has(idx)){ manualBoundaries.delete(idx); gap.classList.remove("marked"); }
+          else { manualBoundaries.add(idx); gap.classList.add("marked"); }
+        });
+        container.appendChild(gap);
+      } else {
+        container.appendChild(document.createTextNode(" "));
+      }
+    });
+
+    document.getElementById("reset-manual-btn").addEventListener("click", renderManual);
+    document.getElementById("hint-count-btn").addEventListener("click", function(){
+      var n = currentChunks.length - 1;
+      document.getElementById("hint-count-text").textContent =
+        "このツールなら " + Math.max(n, 0) + " か所に分けます（場所はヒミツです）。";
+    });
+    document.getElementById("check-btn").addEventListener("click", function(){
+      var autoBoundaries = new Set();
+      var count = 0;
+      currentChunks.forEach(function(c){
+        count += c.words.length;
+        if (count < words.length) autoBoundaries.add(count - 1);
+      });
+      var matches = 0;
+      autoBoundaries.forEach(function(b){ if (manualBoundaries.has(b)) matches++; });
+      var total = autoBoundaries.size || 1;
+      var pct = Math.round((matches / total) * 100);
+      var msg;
+      if (pct >= 80) msg = "素晴らしい！ツールの分解とよく一致しています。";
+      else if (pct >= 50) msg = "いい線です。「構造マップ」で答えと見比べてみましょう。";
+      else msg = "まずは「構造マップ」で正解の切れ目を確認してみましょう。";
+      document.getElementById("score-area").innerHTML =
+        '<div class="score-box">一致率: ' + pct + '%（' + matches + ' / ' + total + '）<br>' + msg + '</div>';
+    });
+  }
+
+  /* ---------------------------------------------------------
+     5. エクスポート / インポート
+  --------------------------------------------------------- */
+  document.getElementById("export-btn").addEventListener("click", function(){
+    var blob = new Blob([JSON.stringify(store, null, 2)], {type:"application/json"});
+    var a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = "zenkarayomi-data.json";
+    a.click();
+  });
+  document.getElementById("import-input").addEventListener("change", function(e){
+    var file = e.target.files[0];
+    if (!file) return;
+    var reader = new FileReader();
+    reader.onload = function(){
+      try{
+        var data = JSON.parse(reader.result);
+        store = {
+          totalCompleted: data.totalCompleted || 0,
+          lastDate: data.lastDate || null,
+          streak: data.streak || 0,
+          customSentences: data.customSentences || [],
+          notes: data.notes || {}
+        };
+        saveStore(store);
+        renderStats();
+      }catch(err){ alert("読み込みに失敗しました。ファイル形式を確認してください。"); }
+    };
+    reader.readAsText(file);
+  });
+
+  renderStats();
+})();
+</script>
+</body>
+</html>
